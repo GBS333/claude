@@ -38,7 +38,7 @@ para ganhar dinheiro por segundo.
 | 5 | Cabeçada (corpo a corpo forte) | Z |
 | 10 | Rajada Brainrot (de longe) | X |
 | 20 | Terremoto (acerta todos em volta) | C |
-| 30 | **Golpe especial** de cada brainrot (ex.: *Ligação Explosiva*, *Miado Cósmico*) | V |
+| 30 | **Golpe especial** de cada brainrot (ex.: *Tung Tung Tung!*, *Tsunami Tralala*, *Bombardeio*) | V |
 
 Mire com o mouse no brainrot e aperte a tecla (ou toque no botão do ataque na tela).
 
@@ -51,11 +51,11 @@ Vida e renda abaixo são no **nível 1** (aumentam com o nível).
 
 | Raridade | Exemplos | Vida | Chance base | Renda | Nível selvagem |
 |---|---|---|---|---|---|
-| Comum | Bananito Telefonino, Sapo Tamburello, Pizzaroni Turbonelli | 50–70 | 40–50% | $1–3/s | 1–5 |
-| Raro | Tostadino Volante, Mucca Skateboardina, Melancino Patinetto | 120–140 | 25–28% | $8–10/s | 3–8 |
-| Épico | Pinguino Spaghettino, Girafino Lampadino | 250–280 | 12–14% | $25–30/s | 6–12 |
-| Lendário | Polpo Saxofono, Dinossauro Croissantino | 500–550 | 6–7% | $80–90/s | 10–16 |
-| Mítico | Gattino Cosmonauta | 1000 | 3% | $250/s | 15–20 |
+| Comum | Lirilì Larilà, Boneca Ambalabu, Trippi Troppi, Chimpanzini Bananini | 50–70 | 40–50% | $1–3/s | 1–5 |
+| Raro | Tung Tung Tung Sahur, Brr Brr Patapim, Bombombini Gusini | 120–140 | 25–28% | $8–10/s | 3–8 |
+| Épico | Ballerina Cappuccina, Cappuccino Assassino, Frigo Camelo | 250–280 | 12–14% | $25–30/s | 6–12 |
+| Lendário | Tralalero Tralala, Bombardiro Crocodilo | 500–550 | 6–7% | $80–90/s | 10–16 |
+| Mítico | La Vaca Saturno Saturnita | 1000 | 3% | $250/s | 15–20 |
 
 ### Bolas
 
@@ -141,13 +141,49 @@ StarterPlayer
 
 ---
 
+## Deixar os brainrots bonitos (modelos 3D da Toolbox)
+
+Sem modelo, cada brainrot é montado com peças simples no formato dele. Para ficar igual ao meme,
+use os modelos 3D grátis da Toolbox do Roblox:
+
+1. No Studio: **View → Toolbox**, aba **Models**. Pesquise o nome (ex.: `Tung Tung Tung Sahur`).
+2. Clique no modelo para colocar no mapa.
+3. No **Explorer**, crie uma pasta chamada **`BrainrotModels`** dentro de **ServerStorage**
+   (botão direito em ServerStorage → Insert Object → Folder).
+4. Arraste o modelo para dentro dessa pasta e **renomeie** com o `id` da tabela abaixo.
+5. Aperte **Play**. O jogo ajusta o tamanho sozinho e usa o modelo nos selvagens, nos pedestais e no parceiro.
+
+| id (nome do modelo) | Brainrot |
+|---|---|
+| `Lirili` | Lirilì Larilà |
+| `Ambalabu` | Boneca Ambalabu |
+| `TrippiTroppi` | Trippi Troppi |
+| `Chimpanzini` | Chimpanzini Bananini |
+| `TungTung` | Tung Tung Tung Sahur |
+| `Patapim` | Brr Brr Patapim |
+| `Gusini` | Bombombini Gusini |
+| `Ballerina` | Ballerina Cappuccina |
+| `CappuccinoAssassino` | Cappuccino Assassino |
+| `FrigoCamelo` | Frigo Camelo |
+| `Tralalero` | Tralalero Tralala |
+| `Bombardiro` | Bombardiro Crocodilo |
+| `VacaSaturno` | La Vaca Saturno Saturnita |
+
+> ⚠️ **Cuidado com vírus:** modelos da Toolbox podem ter scripts escondidos. O jogo **apaga os scripts** das
+> cópias que ele usa, mas mesmo assim, abra o modelo no Explorer e **apague** qualquer `Script`/`LocalScript`
+> que tiver dentro. Prefira modelos com muitos likes.
+>
+> Se o brainrot andar de costas ou de lado, coloque `modelYaw = 180` (ou `90`/`-90`) nele na Config.
+> Se ficar grande ou pequeno demais, mude a altura em `size` (o segundo número).
+
+---
+
 ## Personalizar
 
 Tudo fica em **`src/shared/Config.luau`**:
 
 - **Novos brainrots:** copie um bloco dentro de `Config.Brainrots` e mude `id`, `name`, cores, vida...
-- **Modelos próprios:** crie uma pasta `BrainrotModels` em **ServerStorage** e coloque um Model com o
-  mesmo `id` da Config (ex.: `Sapo`). Ele precisa de uma **PrimaryPart**. Sem modelo, o jogo monta um com peças.
+- **Modelos 3D:** veja a seção "Deixar os brainrots bonitos" acima.
 - **Seu próprio mapa:** coloque `Config.BuildMap = false` e ajuste `Config.Wild.ZoneCenter` / `ZoneSize`
   para a área onde os brainrots devem andar.
 - **Balanceamento:** vida, chance, preços, renda, dano, tempo de regeneração, quantidade de brainrots no mapa.

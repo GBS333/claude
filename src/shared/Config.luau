@@ -28,95 +28,110 @@ Config.Rarities = {
 
 ---------------------------------------------------------------------
 -- BRAINROTS
+-- id         = nome interno (use esse nome no modelo em ServerStorage/BrainrotModels)
 -- maxHealth  = vida
 -- catchRate  = chance base de captura (0.5 = 50%) com vida cheia e Bola Básica
 -- income     = dinheiro por segundo quando está no pedestal da sua base
 -- sellPrice  = quanto você ganha vendendo
 -- speed      = velocidade andando
 -- damage     = dano que ele te dá quando fica bravo
--- shape      = "Ball", "Block" ou "Cylinder"
--- accessory  = "Antena", "Chapeu", "Orelhas", "Asas", "Disco", "Capacete", "Coroa"
+-- size       = tamanho (largura, ALTURA, comprimento). Modelos da Toolbox são redimensionados para essa altura
+-- modelYaw   = (opcional) gira o modelo da Toolbox em graus, se ele estiver andando de costas/de lado
 -- evolutions = nomes da 2ª e 3ª evolução
 -- signature  = nome do golpe especial (aprende no nível 30)
 -- (vida, dano e renda aumentam com o nível; veja Config.Levels)
+--
+-- Brainrot NOVO sem modelo? Ele vira um boneco simples usando estes campos opcionais:
+--   shape = "Ball"/"Block"/"Cylinder", bodyColor, accentColor,
+--   accessory = "Antena"/"Chapeu"/"Orelhas"/"Asas"/"Disco"/"Capacete"/"Coroa"
 ---------------------------------------------------------------------
 Config.Brainrots = {
+	-- COMUNS
 	{
-		id = "Bananito", name = "Bananito Telefonino", rarity = "Comum",
+		id = "Lirili", name = "Lirilì Larilà", rarity = "Comum",
 		maxHealth = 50, catchRate = 0.50, income = 1, sellPrice = 20, speed = 10, damage = 5,
-		shape = "Cylinder", size = Vector3.new(2.6, 4, 2.6),
-		bodyColor = Color3.fromRGB(255, 225, 60), accentColor = Color3.fromRGB(40, 40, 40), accessory = "Antena",
-		evolutions = { "Bananito Telefonino 5G", "Bananito Smartphonissimo" }, signature = "Ligação Explosiva",
+		size = Vector3.new(2.6, 6, 2.6),
+		evolutions = { "Lirilì Larilà Gigante", "Lirilì Larilà Supremo" }, signature = "Espinhos de Cacto",
 	},
 	{
-		id = "Sapo", name = "Sapo Tamburello", rarity = "Comum",
-		maxHealth = 60, catchRate = 0.45, income = 2, sellPrice = 30, speed = 12, damage = 6,
-		shape = "Ball", size = Vector3.new(3.4, 3.4, 3.4),
-		bodyColor = Color3.fromRGB(80, 200, 80), accentColor = Color3.fromRGB(255, 140, 40), accessory = "Disco",
-		evolutions = { "Sapo Tamburello Rock", "Sapone Batterista" }, signature = "Batuque Sônico",
+		id = "Ambalabu", name = "Boneca Ambalabu", rarity = "Comum",
+		maxHealth = 55, catchRate = 0.48, income = 1.5, sellPrice = 25, speed = 12, damage = 5,
+		size = Vector3.new(2.8, 6, 2.6),
+		evolutions = { "Boneca Ambalabu Turbo", "Boneca Ambalabu Rei do Pneu" }, signature = "Pneu Rolante",
 	},
 	{
-		id = "Pizzaroni", name = "Pizzaroni Turbonelli", rarity = "Comum",
+		id = "TrippiTroppi", name = "Trippi Troppi", rarity = "Comum",
+		maxHealth = 60, catchRate = 0.45, income = 2, sellPrice = 30, speed = 13, damage = 6,
+		size = Vector3.new(2, 3.4, 4),
+		evolutions = { "Trippi Troppi Troppa", "Trippi Troppi Supremo" }, signature = "Miado Camarão",
+	},
+	{
+		id = "Chimpanzini", name = "Chimpanzini Bananini", rarity = "Comum",
 		maxHealth = 70, catchRate = 0.40, income = 3, sellPrice = 40, speed = 14, damage = 7,
-		shape = "Block", size = Vector3.new(3.4, 3, 3),
-		bodyColor = Color3.fromRGB(255, 160, 60), accentColor = Color3.fromRGB(210, 40, 40), accessory = "Chapeu",
-		evolutions = { "Pizzaroni Calzonelli", "Pizzarone Quattro Formaggi" }, signature = "Fatia Turbo",
+		size = Vector3.new(2.2, 5.4, 2.2),
+		evolutions = { "Chimpanzini Bananini Forte", "Chimpanzone Bananone" }, signature = "Casca Escorregadia",
+	},
+
+	-- RAROS
+	{
+		id = "TungTung", name = "Tung Tung Tung Sahur", rarity = "Raro",
+		maxHealth = 130, catchRate = 0.27, income = 9, sellPrice = 140, speed = 16, damage = 12,
+		size = Vector3.new(2.6, 6.5, 2.6),
+		evolutions = { "Tung Tung Tung Tung Sahur", "Tung Tung Sahur Supremo" }, signature = "Tung Tung Tung!",
 	},
 	{
-		id = "Tostadino", name = "Tostadino Volante", rarity = "Raro",
-		maxHealth = 120, catchRate = 0.28, income = 8, sellPrice = 120, speed = 16, damage = 10,
-		shape = "Block", size = Vector3.new(3.6, 3.2, 2.4),
-		bodyColor = Color3.fromRGB(190, 190, 200), accentColor = Color3.fromRGB(140, 90, 50), accessory = "Asas",
-		evolutions = { "Tostadino Jato", "Tostadone Supersonico" }, signature = "Torrada Voadora",
+		id = "Patapim", name = "Brr Brr Patapim", rarity = "Raro",
+		maxHealth = 140, catchRate = 0.25, income = 10, sellPrice = 150, speed = 15, damage = 11,
+		size = Vector3.new(2.6, 6.6, 2.6),
+		evolutions = { "Brr Brr Patapim Ancião", "Brr Brr Patapim da Floresta" }, signature = "Pisão Gigante",
 	},
 	{
-		id = "Mucca", name = "Mucca Skateboardina", rarity = "Raro",
-		maxHealth = 140, catchRate = 0.25, income = 10, sellPrice = 150, speed = 15, damage = 12,
-		shape = "Block", size = Vector3.new(3.8, 3.2, 3.8),
-		bodyColor = Color3.fromRGB(245, 245, 245), accentColor = Color3.fromRGB(30, 30, 30), accessory = "Orelhas",
-		evolutions = { "Mucca Skate Pro", "Muccona Radicale" }, signature = "Manobra Radical",
+		id = "Gusini", name = "Bombombini Gusini", rarity = "Raro",
+		maxHealth = 120, catchRate = 0.28, income = 8, sellPrice = 120, speed = 17, damage = 10,
+		size = Vector3.new(2.4, 5, 3),
+		evolutions = { "Bombombini Gusini Turbo", "Bombombini Gusini Supersônico" }, signature = "Rasante a Jato",
 	},
+
+	-- ÉPICOS
 	{
-		id = "Melancino", name = "Melancino Patinetto", rarity = "Raro",
-		maxHealth = 130, catchRate = 0.26, income = 9, sellPrice = 140, speed = 17, damage = 11,
-		shape = "Ball", size = Vector3.new(3.8, 3.8, 3.8),
-		bodyColor = Color3.fromRGB(40, 150, 60), accentColor = Color3.fromRGB(235, 60, 70), accessory = "Antena",
-		evolutions = { "Melancino Turbo", "Melancione Motociclone" }, signature = "Chuva de Sementes",
-	},
-	{
-		id = "Pinguino", name = "Pinguino Spaghettino", rarity = "Epico",
+		id = "Ballerina", name = "Ballerina Cappuccina", rarity = "Epico",
 		maxHealth = 250, catchRate = 0.14, income = 25, sellPrice = 450, speed = 18, damage = 18,
-		shape = "Ball", size = Vector3.new(4, 4, 4),
-		bodyColor = Color3.fromRGB(35, 35, 45), accentColor = Color3.fromRGB(255, 220, 90), accessory = "Chapeu",
-		evolutions = { "Pinguino Lasagnino", "Pinguinone Carbonarone" }, signature = "Chicote de Espaguete",
+		size = Vector3.new(2.6, 6, 2.6),
+		evolutions = { "Ballerina Cappuccina Prima", "Ballerina Cappuccina Suprema" }, signature = "Pirueta Espresso",
 	},
 	{
-		id = "Girafino", name = "Girafino Lampadino", rarity = "Epico",
-		maxHealth = 280, catchRate = 0.12, income = 30, sellPrice = 520, speed = 16, damage = 20,
-		shape = "Cylinder", size = Vector3.new(2.8, 5.5, 2.8),
-		bodyColor = Color3.fromRGB(240, 180, 70), accentColor = Color3.fromRGB(255, 255, 150), accessory = "Antena",
-		evolutions = { "Girafino LED", "Girafone Lampione Neon" }, signature = "Flash Ofuscante",
+		id = "CappuccinoAssassino", name = "Cappuccino Assassino", rarity = "Epico",
+		maxHealth = 260, catchRate = 0.13, income = 28, sellPrice = 480, speed = 19, damage = 20,
+		size = Vector3.new(2.8, 4.6, 2.6),
+		evolutions = { "Cappuccino Assassino Sombra", "Cappuccino Assassino Mestre" }, signature = "Corte Duplo",
 	},
 	{
-		id = "Polpo", name = "Polpo Saxofono", rarity = "Lendario",
-		maxHealth = 500, catchRate = 0.07, income = 80, sellPrice = 1500, speed = 19, damage = 30,
-		shape = "Ball", size = Vector3.new(4.6, 4.6, 4.6),
-		bodyColor = Color3.fromRGB(150, 60, 200), accentColor = Color3.fromRGB(255, 200, 50), accessory = "Disco",
-		evolutions = { "Polpo Jazzista", "Polpone Orchestrone" }, signature = "Solo de Saxofone",
+		id = "FrigoCamelo", name = "Frigo Camelo", rarity = "Epico",
+		maxHealth = 280, catchRate = 0.12, income = 30, sellPrice = 520, speed = 16, damage = 19,
+		size = Vector3.new(2.4, 6.6, 3),
+		evolutions = { "Frigo Camelo Freezer", "Frigo Camelo Polar" }, signature = "Sopro Congelante",
+	},
+
+	-- LENDÁRIOS
+	{
+		id = "Tralalero", name = "Tralalero Tralala", rarity = "Lendario",
+		maxHealth = 500, catchRate = 0.07, income = 80, sellPrice = 1500, speed = 20, damage = 30,
+		size = Vector3.new(2.6, 4.6, 6),
+		evolutions = { "Tralalero Tralala Turbo", "Tralalero Tralala Supremo" }, signature = "Tsunami Tralala",
 	},
 	{
-		id = "Croissantino", name = "Dinossauro Croissantino", rarity = "Lendario",
-		maxHealth = 550, catchRate = 0.06, income = 90, sellPrice = 1700, speed = 20, damage = 32,
-		shape = "Block", size = Vector3.new(4.4, 4.6, 4.4),
-		bodyColor = Color3.fromRGB(90, 170, 90), accentColor = Color3.fromRGB(220, 170, 100), accessory = "Orelhas",
-		evolutions = { "Dino Croissant Rex", "Dinossaurone Baguettone" }, signature = "Mordida Amanteigada",
+		id = "Bombardiro", name = "Bombardiro Crocodilo", rarity = "Lendario",
+		maxHealth = 550, catchRate = 0.06, income = 90, sellPrice = 1700, speed = 21, damage = 32,
+		size = Vector3.new(4, 5, 7),
+		evolutions = { "Bombardiro Crocodilo Ás", "Bombardiro Crocodilo Supremo" }, signature = "Bombardeio",
 	},
+
+	-- MÍTICO
 	{
-		id = "Gattino", name = "Gattino Cosmonauta", rarity = "Mitico",
+		id = "VacaSaturno", name = "La Vaca Saturno Saturnita", rarity = "Mitico",
 		maxHealth = 1000, catchRate = 0.03, income = 250, sellPrice = 6000, speed = 22, damage = 45,
-		shape = "Ball", size = Vector3.new(4.4, 4.4, 4.4),
-		bodyColor = Color3.fromRGB(250, 250, 255), accentColor = Color3.fromRGB(80, 230, 255), accessory = "Capacete",
-		evolutions = { "Gatto Galattico", "Gattone Universale" }, signature = "Miado Cósmico",
+		size = Vector3.new(3.4, 5.2, 3.4),
+		evolutions = { "La Vaca Saturno Galáctica", "La Vaca Saturno Suprema" }, signature = "Anel de Saturno",
 	},
 }
 

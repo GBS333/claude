@@ -36,7 +36,7 @@ local function defaultData()
 		balls = deepCopy(Config.StartingBalls),
 		bat = "Madeira",
 		ownedBats = { Madeira = true },
-		inventory = {}, -- lista de { uid = "1", id = "Sapo", level = 1, xp = 0, slot = nil ou número do pedestal }
+		inventory = {}, -- lista de { uid = "1", id = "TungTung", level = 1, xp = 0, slot = nil ou número do pedestal }
 		-- companion = uid do brainrot parceiro (ou nil)
 		unlockedSlots = Config.Tycoon.StartingSlots,
 		dex = {}, -- [id] = quantas vezes capturou

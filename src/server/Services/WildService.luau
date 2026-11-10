@@ -258,7 +258,7 @@ local function spawnOne()
 		transparency = {},
 	}
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") then
+		if d:IsA("BasePart") or d:IsA("Decal") then -- Decal inclui Texture (rostos dos modelos da Toolbox)
 			state.transparency[d] = d.Transparency
 		end
 	end

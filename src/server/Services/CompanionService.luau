@@ -157,7 +157,7 @@ function Companion:setVisible(visible: boolean)
 		return
 	end
 	for _, d in ipairs(self.model:GetDescendants()) do
-		if d:IsA("BasePart") then
+		if d:IsA("BasePart") or d:IsA("Decal") then
 			if visible then
 				local original = d:GetAttribute("OriginalTransparency")
 				if original then
