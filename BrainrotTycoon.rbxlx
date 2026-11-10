@@ -423,7 +423,7 @@ function Stats.xpReward(def, level: number): number
 end
 
 return Stats
-]]></ProtectedString></Properties></Item></Item></Item><Item class="ServerScriptService" referent="RBX00000000000000000000000000000013"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX00000000000000000000000000000012"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX00000000000000000000000000000007"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Script principal do servidor: liga todos os sistemas do jogo.
+]]></ProtectedString></Properties></Item></Item></Item><Item class="ServerScriptService" referent="RBX00000000000000000000000000000014"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX00000000000000000000000000000013"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX00000000000000000000000000000007"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Script principal do servidor: liga todos os sistemas do jogo.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -436,6 +436,7 @@ local TycoonService = require(Services.TycoonService)
 local WildService = require(Services.WildService)
 local ToolService = require(Services.ToolService)
 local CompanionService = require(Services.CompanionService)
+local InventoryService = require(Services.InventoryService)
 local ShopService = require(Services.ShopService)
 
 WorldBuilder.build()
@@ -443,6 +444,7 @@ TycoonService.start()
 WildService.start()
 ToolService.start()
 CompanionService.start()
+InventoryService.start()
 ShopService.start()
 
 local function onCharacter(player: Player, character: Model)
@@ -454,6 +456,7 @@ local function onCharacter(player: Player, character: Model)
 		return
 	end
 	ToolService.giveTools(player)
+	InventoryService.sync(player, true) -- brainrots capturados na barra de itens
 	TycoonService.teleportHome(player)
 	task.wait(0.1)
 	CompanionService.spawn(player) -- seu parceiro aparece do seu lado
@@ -504,7 +507,7 @@ game:BindToClose(function()
 	end
 	task.wait(3)
 end)
-]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX00000000000000000000000000000011"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX00000000000000000000000000000008"><Properties><string name="Name">BrainrotModels</string><ProtectedString name="Source"><![CDATA[-- Monta o visual de cada brainrot.
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX00000000000000000000000000000012"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX00000000000000000000000000000008"><Properties><string name="Name">BrainrotModels</string><ProtectedString name="Source"><![CDATA[-- Monta o visual de cada brainrot.
 --
 -- MODELOS 3D DE VERDADE (recomendado):
 --   1. No Studio: View → Toolbox → pesquise o nome (ex.: "Tung Tung Tung Sahur").
@@ -2010,6 +2013,15 @@ function DataService.pushUpdate(player: Player)
 	end
 	updateLeaderstats(player, data)
 	Remotes.DataUpdated:FireClient(player, DataService.snapshot(player))
+	for _, callback in ipairs(DataService.updateListeners) do
+		task.spawn(callback, player)
+	end
+end
+
+-- Outros sistemas podem pedir para ser avisados quando os dados mudam
+DataService.updateListeners = {}
+function DataService.onUpdate(callback)
+	table.insert(DataService.updateListeners, callback)
 end
 
 ---------------------------------------------------------------------
@@ -2117,7 +2129,154 @@ task.spawn(function()
 end)
 
 return DataService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000B"><Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[-- Cria os RemoteEvents/RemoteFunctions usados para servidor <-> jogador.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000B"><Properties><string name="Name">InventoryService</string><ProtectedString name="Source"><![CDATA[-- Cada brainrot capturado (que não está no pedestal e não é o parceiro) vira um ITEM
+-- na barra de itens do jogador. Segure ele e clique perto de um pedestal vazio da sua
+-- base para colocar (ou use o "Colocar Brainrot" do pedestal segurando ele).
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Stats = require(ReplicatedStorage.Shared.Stats)
+local DataService = require(script.Parent.DataService)
+local TycoonService = require(script.Parent.TycoonService)
+local BrainrotModels = require(script.Parent.BrainrotModels)
+local Remotes = require(script.Parent.Remotes)
+
+local InventoryService = {}
+
+local UID_ATTRIBUTE = "BrainrotUid"
+local HOLD_HEIGHT = 2.6 -- altura do brainrot na mão
+local PLACE_DISTANCE = 16
+
+local function createTool(player: Player, item)
+	local def = Config.getBrainrot(item.id)
+	if not def then
+		return nil
+	end
+	local level = item.level or 1
+	local name = Stats.displayName(def, level)
+
+	local tool = Instance.new("Tool")
+	tool.Name = name .. " Lv." .. level
+	tool.ToolTip = "Clique perto de um pedestal vazio da sua base para colocar"
+	tool.CanBeDropped = false
+	tool:SetAttribute(UID_ATTRIBUTE, item.uid)
+	tool:SetAttribute("Level", level)
+
+	-- miniatura do brainrot soldada na "Handle"
+	local model = BrainrotModels.build(def, HOLD_HEIGHT / math.max(def.size.Y, 0.5), Stats.stage(level))
+	local root = model.PrimaryPart
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("Humanoid") then
+			d:Destroy() -- modelos da Toolbox: Humanoid dentro de ferramenta dá problema
+		elseif d:IsA("BasePart") then
+			d.Anchored = false
+			d.Massless = true
+			d.CanCollide = false
+			d.CanTouch = false
+			d.CanQuery = false
+			if d ~= root then
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = root
+				weld.Part1 = d
+				weld.Parent = root
+			end
+		end
+	end
+	root.Name = "Handle"
+	for _, child in ipairs(model:GetChildren()) do
+		child.Parent = tool
+	end
+	model:Destroy()
+
+	-- segura com o brainrot em cima da mão, um pouco para a frente
+	tool.Grip = CFrame.new(0, -root.Size.Y / 2, 0.6)
+
+	tool.Activated:Connect(function()
+		InventoryService.placeHeld(player, tool)
+	end)
+	return tool
+end
+
+function InventoryService.placeHeld(player: Player, tool: Tool)
+	local uid = tool:GetAttribute(UID_ATTRIBUTE)
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart")
+	if not uid or not hrp or tool.Parent ~= character then
+		return
+	end
+	local slotIndex = TycoonService.findFreeSlotNear(player, hrp.Position, PLACE_DISTANCE)
+	if not slotIndex then
+		Remotes.notify(player, "Chegue perto de um pedestal VAZIO da sua base 🏠 (ou desbloqueie mais pedestais).",
+			Color3.fromRGB(255, 200, 90))
+		return
+	end
+	local ok, msg = TycoonService.place(player, uid, slotIndex)
+	if msg then
+		Remotes.notify(player, msg, if ok then Color3.fromRGB(120, 255, 140) else Color3.fromRGB(255, 120, 120))
+	end
+end
+
+-- Deixa os itens iguais ao inventário. reorder = true coloca os brainrots depois do Taco e da Bola.
+function InventoryService.sync(player: Player, reorder: boolean?)
+	local data = DataService.get(player)
+	local backpack = player:FindFirstChild("Backpack")
+	if not data or not backpack then
+		return
+	end
+
+	local wanted = {}
+	for _, item in ipairs(data.inventory) do
+		if not item.slot and item.uid ~= data.companion then
+			wanted[item.uid] = item
+		end
+	end
+
+	local existing = {}
+	for _, container in ipairs({ backpack, player.Character }) do
+		if container then
+			for _, tool in ipairs(container:GetChildren()) do
+				local uid = tool:IsA("Tool") and tool:GetAttribute(UID_ATTRIBUTE)
+				if uid then
+					local item = wanted[uid]
+					if not item or existing[uid] or tool:GetAttribute("Level") ~= (item.level or 1) then
+						tool:Destroy() -- foi colocado/vendido, é repetido ou subiu de nível
+					else
+						existing[uid] = tool
+					end
+				end
+			end
+		end
+	end
+
+	if reorder then
+		for _, tool in pairs(existing) do
+			if tool.Parent == backpack then
+				tool.Parent = nil
+				tool.Parent = backpack
+			end
+		end
+	end
+
+	-- cria os que faltam, na ordem do inventário
+	for _, item in ipairs(data.inventory) do
+		if wanted[item.uid] and not existing[item.uid] then
+			local tool = createTool(player, item)
+			if tool then
+				tool.Parent = backpack
+			end
+		end
+	end
+end
+
+function InventoryService.start()
+	DataService.onUpdate(function(player)
+		InventoryService.sync(player)
+	end)
+end
+
+return InventoryService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000C"><Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[-- Cria os RemoteEvents/RemoteFunctions usados para servidor <-> jogador.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -2152,7 +2311,7 @@ function Remotes.notify(player: Player, text: string, color: Color3?)
 end
 
 return Remotes
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000C"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[-- Recebe os pedidos da interface do jogador: comprar bolas/tacos, escolher bola,
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000D"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[-- Recebe os pedidos da interface do jogador: comprar bolas/tacos, escolher bola,
 -- colocar/guardar/vender brainrots e desbloquear pedestais.
 
 local Players = game:GetService("Players")
@@ -2164,6 +2323,7 @@ local DataService = require(script.Parent.DataService)
 local TycoonService = require(script.Parent.TycoonService)
 local ToolService = require(script.Parent.ToolService)
 local CompanionService = require(script.Parent.CompanionService)
+local InventoryService = require(script.Parent.InventoryService)
 local Stats = require(ReplicatedStorage.Shared.Stats)
 local Remotes = require(script.Parent.Remotes)
 
@@ -2217,6 +2377,7 @@ function actions.BuyBat(player, batId)
 	end
 	data.bat = batId
 	ToolService.giveTools(player)
+	InventoryService.sync(player, true)
 	DataService.pushUpdate(player)
 	return true, batDef.name .. " equipado!"
 end
@@ -2323,7 +2484,7 @@ function ShopService.start()
 end
 
 return ShopService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000D"><Properties><string name="Name">ToolService</string><ProtectedString name="Source"><![CDATA[-- Ferramentas: o TACO de beisebol (bater) e a BOLA DE CAPTURA (capturar).
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000E"><Properties><string name="Name">ToolService</string><ProtectedString name="Source"><![CDATA[-- Ferramentas: o TACO de beisebol (bater) e a BOLA DE CAPTURA (capturar).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -2681,7 +2842,7 @@ function ToolService.start()
 end
 
 return ToolService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000E"><Properties><string name="Name">TycoonService</string><ProtectedString name="Source"><![CDATA[-- Bases dos jogadores (o "tycoon"): pedestais onde você coloca seus brainrots
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000F"><Properties><string name="Name">TycoonService</string><ProtectedString name="Source"><![CDATA[-- Bases dos jogadores (o "tycoon"): pedestais onde você coloca seus brainrots
 -- capturados. Cada brainrot gera dinheiro por segundo, que vai para o coletor.
 
 local Players = game:GetService("Players")
@@ -2760,8 +2921,49 @@ local function buildPlot(index: number, info)
 
 	part(model, {
 		Name = "Base", Size = Vector3.new(T.PlotSize, 1, T.PlotSize), CFrame = cf * CFrame.new(0, 0.5, 0),
-		Color = Color3.fromRGB(225, 225, 225), Material = Enum.Material.SmoothPlastic,
+		Color = Color3.fromRGB(230, 225, 215), Material = Enum.Material.Concrete,
 	})
+	-- piso de madeira
+	part(model, {
+		Name = "Floor", Size = Vector3.new(T.PlotSize - 8, 0.2, T.PlotSize - 14), CFrame = cf * CFrame.new(0, 1.05, -3),
+		Color = Color3.fromRGB(205, 160, 110), Material = Enum.Material.WoodPlanks,
+	})
+	-- muretas nos lados e atrás (a frente fica aberta)
+	local half = T.PlotSize / 2
+	local walls = {
+		{ Vector3.new(T.PlotSize, 3, 1), CFrame.new(0, 2.5, -half + 0.5) },
+		{ Vector3.new(1, 3, T.PlotSize), CFrame.new(-half + 0.5, 2.5, 0) },
+		{ Vector3.new(1, 3, T.PlotSize), CFrame.new(half - 0.5, 2.5, 0) },
+	}
+	for _, w in ipairs(walls) do
+		part(model, { Name = "Wall", Size = w[1], CFrame = cf * w[2], Color = Color3.fromRGB(235, 230, 220), Material = Enum.Material.Brick })
+		part(model, {
+			Name = "WallCap", Size = w[1] + Vector3.new(0.4, -2.6, 0.4), CFrame = cf * w[2] * CFrame.new(0, 1.7, 0),
+			Color = color, Material = Enum.Material.SmoothPlastic,
+		})
+	end
+	-- arbustos nas muretas e postes de luz na frente
+	for _, x in ipairs({ -33, -25, 25, 33 }) do
+		local bush = part(model, {
+			Name = "Bush", Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = cf * CFrame.new(x, 2.5, -half + 3),
+			Color = Color3.fromRGB(70, 155, 65), Material = Enum.Material.Grass, CanCollide = false,
+		})
+		bush.CastShadow = false
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		part(model, {
+			Name = "LampPost", Size = Vector3.new(0.6, 9, 0.6), CFrame = cf * CFrame.new(s * (half - 2), 5.5, half - 2),
+			Color = Color3.fromRGB(50, 50, 55), Material = Enum.Material.Metal,
+		})
+		local bulb = part(model, {
+			Name = "Lamp", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.6, CFrame = cf * CFrame.new(s * (half - 2), 10.5, half - 2),
+			Color = color, Material = Enum.Material.Neon, CanCollide = false,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 18
+		light.Parent = bulb
+	end
 	-- borda colorida
 	part(model, {
 		Name = "Border", Size = Vector3.new(T.PlotSize + 2, 0.8, T.PlotSize + 2), CFrame = cf * CFrame.new(0, 0.3, 0),
@@ -2825,7 +3027,14 @@ local function buildPlot(index: number, info)
 			local slotCF = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT / 2, z)
 			local pedestal = part(model, {
 				Name = "Pedestal" .. n, Shape = Enum.PartType.Cylinder, Size = Vector3.new(PEDESTAL_HEIGHT, 8, 8),
-				CFrame = slotCF * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(90, 90, 100),
+				CFrame = slotCF * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(235, 235, 240),
+				Material = Enum.Material.Marble,
+			})
+			-- anel colorido em cima (muda de cor com a raridade)
+			local ring = part(model, {
+				Name = "PedestalRing" .. n, Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, 7, 7),
+				CFrame = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT + 0.05, z) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(90, 90, 100), CanCollide = false,
 			})
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.RequiresLineOfSight = false
@@ -2837,6 +3046,7 @@ local function buildPlot(index: number, info)
 			local slot = {
 				index = n,
 				part = pedestal,
+				ring = ring,
 				topCF = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT, z) * CFrame.Angles(0, math.pi, 0),
 				prompt = prompt,
 				label = billboard(pedestal, 6, 200, 50),
@@ -2891,9 +3101,13 @@ local function refreshSlot(plot, slot)
 	local data = owner and DataService.get(owner)
 	local prompt = slot.prompt
 
+	local function setRing(color: Color3, glowing: boolean)
+		slot.ring.Color = color
+		slot.ring.Material = if glowing then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	end
+
 	if not data then
-		slot.part.Color = Color3.fromRGB(90, 90, 100)
-		slot.part.Material = Enum.Material.SmoothPlastic
+		setRing(Color3.fromRGB(90, 90, 100), false)
 		slot.label.Text = ""
 		prompt.Enabled = false
 		return
@@ -2901,8 +3115,7 @@ local function refreshSlot(plot, slot)
 
 	if slot.index > data.unlockedSlots then
 		local price = T.SlotPrices[slot.index] or 0
-		slot.part.Color = Color3.fromRGB(70, 70, 75)
-		slot.part.Material = Enum.Material.SmoothPlastic
+		setRing(Color3.fromRGB(70, 70, 75), false)
 		if slot.index == data.unlockedSlots + 1 then
 			slot.label.Text = "🔒 Desbloquear\n<font color=\"#7CFF7C\">$" .. fmt(price) .. "</font>"
 			prompt.ActionText = "Desbloquear"
@@ -2916,13 +3129,12 @@ local function refreshSlot(plot, slot)
 	end
 
 	local item = itemInSlot(data, slot.index)
-	slot.part.Material = Enum.Material.Neon
 	if item then
 		local def = Config.getBrainrot(item.id)
 		local rarity = Config.getRarity(def.rarity)
 		local level = item.level or 1
 		local name = Stats.displayName(def, level)
-		slot.part.Color = rarity.color
+		setRing(rarity.color, true)
 
 		local model = BrainrotModels.build(def, 0.9 * Stats.scale(level), Stats.stage(level))
 		local hip = model:GetAttribute("HipHeight") or def.size.Y / 2
@@ -2935,8 +3147,8 @@ local function refreshSlot(plot, slot)
 		prompt.ObjectText = name
 		prompt.Enabled = true
 	else
-		slot.part.Color = Color3.fromRGB(180, 180, 190)
-		slot.label.Text = "Vazio"
+		setRing(Color3.fromRGB(200, 230, 255), true)
+		slot.label.Text = "Vazio\n<font size=\"14\">segure um brainrot e clique</font>"
 		prompt.ActionText = "Colocar Brainrot"
 		prompt.ObjectText = "Pedestal " .. slot.index
 		prompt.Enabled = true
@@ -3129,7 +3341,11 @@ function TycoonService.onSlotPrompt(player: Player, plot, slot)
 		if item then
 			ok, msg = TycoonService.store(player, item.uid)
 		else
-			ok, msg = TycoonService.place(player, nil, slot.index)
+			-- se estiver segurando um brainrot, coloca ele; senão coloca o que dá mais dinheiro
+			local character = player.Character
+			local held = character and character:FindFirstChildOfClass("Tool")
+			local heldUid = held and held:GetAttribute("BrainrotUid")
+			ok, msg = TycoonService.place(player, heldUid, slot.index)
 		end
 	end
 	if msg then
@@ -3188,6 +3404,26 @@ function TycoonService.release(player: Player)
 	updateCollectorLabel(plot)
 end
 
+-- Pedestal vazio (e desbloqueado) mais perto de uma posição, na base do jogador
+function TycoonService.findFreeSlotNear(player: Player, position: Vector3, maxDistance: number): number?
+	local plot = plotByPlayer[player]
+	local data = DataService.get(player)
+	if not plot or not data then
+		return nil
+	end
+	local best, bestDist = nil, maxDistance
+	for i = 1, math.min(data.unlockedSlots, #plot.slots) do
+		if not itemInSlot(data, i) then
+			local offset = plot.slots[i].topCF.Position - position
+			local dist = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if dist <= bestDist then
+				best, bestDist = i, dist
+			end
+		end
+	end
+	return best
+end
+
 function TycoonService.teleportHome(player: Player)
 	local plot = plotByPlayer[player]
 	local character = player.Character
@@ -3217,7 +3453,7 @@ function TycoonService.start()
 end
 
 return TycoonService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000000000000000000000000000000F"><Properties><string name="Name">WildService</string><ProtectedString name="Source"><![CDATA[-- Brainrots selvagens: nascem na zona de caça, andam, apanham do taco,
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000000000000000000000000000010"><Properties><string name="Name">WildService</string><ProtectedString name="Source"><![CDATA[-- Brainrots selvagens: nascem na zona de caça, andam, apanham do taco,
 -- ficam bravos e atacam, regeneram vida e desmaiam se a vida zerar.
 
 local Players = game:GetService("Players")
@@ -3827,15 +4063,27 @@ function WildService.start()
 end
 
 return WildService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000000000000000000000000000010"><Properties><string name="Name">WorldBuilder</string><ProtectedString name="Source"><![CDATA[-- Constrói o mapa básico: chão, zona de caça (com árvores) e o ponto de spawn.
--- As bases (tycoons) são construídas pelo TycoonService.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000000000000000000000000000011"><Properties><string name="Name">WorldBuilder</string><ProtectedString name="Source"><![CDATA[-- Constrói o mapa: uma ilha de terreno com mar em volta, montanhas, caminhos de pedra,
+-- árvores, flores, pedras, a Zona de Caça cercada (com portais e uma estátua no meio)
+-- e uma iluminação mais bonita. As bases (tycoons) são construídas pelo TycoonService.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local BrainrotModels = require(script.Parent.BrainrotModels)
 
 local WorldBuilder = {}
+
+local V = Vector3.new
+local RGB = Color3.fromRGB
+local M = Enum.Material
+
+local terrain = workspace.Terrain
+local rng = Random.new(2025)
+
+local ISLAND = 640 -- tamanho da ilha (grama)
+local BEACH = 40 -- largura da praia
 
 local function part(parent, props)
 	local p = Instance.new("Part")
@@ -3849,52 +4097,275 @@ local function part(parent, props)
 	return p
 end
 
-local function sign(parent, cf: CFrame, text: string, color: Color3)
-	local board = part(parent, {
-		Name = "Sign", Size = Vector3.new(30, 7, 1), CFrame = cf,
-		Color = Color3.fromRGB(60, 40, 25), Material = Enum.Material.Wood,
+local function cyl(parent, diameter: number, height: number, pos: Vector3, color: Color3, material)
+	return part(parent, {
+		Shape = Enum.PartType.Cylinder, Size = V(height, diameter, diameter),
+		CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Material = material or M.SmoothPlastic,
 	})
-	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+end
+
+local function ball(parent, diameter: number, pos: Vector3, color: Color3, material)
+	return part(parent, {
+		Shape = Enum.PartType.Ball, Size = Vector3.one * diameter, CFrame = CFrame.new(pos), Color = color,
+		Material = material or M.SmoothPlastic, CanCollide = false,
+	})
+end
+
+local function textOn(board: BasePart, text: string, color: Color3, faces)
+	for _, face in ipairs(faces) do
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
-		gui.CanvasSize = Vector2.new(600, 140)
+		gui.CanvasSize = Vector2.new(board.Size.X * 20, board.Size.Y * 20)
 		gui.LightInfluence = 0
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
 		label.Text = text
 		label.TextColor3 = color
+		label.TextStrokeTransparency = 0
 		label.TextScaled = true
 		label.Font = Enum.Font.FredokaOne
 		label.Parent = gui
 		gui.Parent = board
 	end
-	for _, side in ipairs({ -1, 1 }) do
-		part(parent, {
-			Name = "SignPost", Size = Vector3.new(1, cf.Position.Y + 3.5, 1),
-			CFrame = CFrame.new((cf * CFrame.new(side * 13, 0, 0)).Position * Vector3.new(1, 0, 1) + Vector3.new(0, (cf.Position.Y + 3.5) / 2, 0)),
-			Color = Color3.fromRGB(60, 40, 25), Material = Enum.Material.Wood,
-		})
+end
+
+---------------------------------------------------------------------
+-- Onde NÃO colocar decoração (zona de caça, bases, caminhos, spawn)
+---------------------------------------------------------------------
+local blocked = {} -- lista de retângulos { minX, maxX, minZ, maxZ }
+
+local function block(cx, cz, sx, sz)
+	table.insert(blocked, { cx - sx / 2, cx + sx / 2, cz - sz / 2, cz + sz / 2 })
+end
+
+local function isFree(x: number, z: number, margin: number): boolean
+	for _, r in ipairs(blocked) do
+		if x > r[1] - margin and x < r[2] + margin and z > r[3] - margin and z < r[4] + margin then
+			return false
+		end
 	end
-	return board
+	return true
 end
 
-local function tree(parent, pos: Vector3)
-	local height = math.random(8, 14)
+---------------------------------------------------------------------
+-- Terreno
+---------------------------------------------------------------------
+local function path(x1, z1, x2, z2, width)
+	local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
+	local sx = math.abs(x2 - x1) + width
+	local sz = math.abs(z2 - z1) + width
+	terrain:FillBlock(CFrame.new(cx, -2, cz), V(sx, 4, sz), M.Cobblestone)
+	block(cx, cz, sx, sz)
+end
+
+local function buildTerrain()
+	terrain:SetMaterialColor(M.Grass, RGB(100, 180, 75))
+	terrain:SetMaterialColor(M.LeafyGrass, RGB(80, 160, 65))
+	terrain:SetMaterialColor(M.Cobblestone, RGB(160, 150, 135))
+	terrain:SetMaterialColor(M.Sand, RGB(235, 220, 165))
+	terrain:SetMaterialColor(M.Rock, RGB(125, 120, 115))
+	terrain.WaterColor = RGB(40, 150, 210)
+	terrain.WaterTransparency = 0.4
+	terrain.WaterWaveSize = 0.15
+	terrain.WaterWaveSpeed = 8
+	pcall(function()
+		terrain.Decoration = true -- grama animada (se estiver disponível)
+	end)
+
+	-- mar, fundo de areia, praia e a ilha
+	terrain:FillBlock(CFrame.new(0, -22, 0), V(1400, 4, 1400), M.Sand)
+	terrain:FillBlock(CFrame.new(0, -11, 0), V(1400, 18, 1400), M.Water)
+	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND + BEACH * 2, 16, ISLAND + BEACH * 2), M.Sand)
+	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND, 16, ISLAND), M.Grass)
+
+	-- zona de caça com grama mais escura
+	local W = Config.Wild
+	terrain:FillBlock(CFrame.new(W.ZoneCenter.X, -2, W.ZoneCenter.Z), V(W.ZoneSize.X, 4, W.ZoneSize.Y), M.LeafyGrass)
+	block(W.ZoneCenter.X, W.ZoneCenter.Z, W.ZoneSize.X + 8, W.ZoneSize.Y + 8)
+
+	-- caminhos de pedra: das bases até a zona de caça
+	for _, info in ipairs(Config.Tycoon.Plots) do
+		local p = info.position
+		block(p.X, p.Z, Config.Tycoon.PlotSize + 6, Config.Tycoon.PlotSize + 6)
+		local dir = if p.Z > 0 then -1 else 1
+		local front = p.Z + dir * Config.Tycoon.PlotSize / 2
+		path(p.X, front, p.X, front + dir * 14, 10)
+	end
+	local edge = W.ZoneSize.Y / 2
+	local roadZ = 136
+	for _, s in ipairs({ -1, 1 }) do
+		path(-140, s * roadZ, 140, s * roadZ, 10) -- estrada na frente das bases
+		path(0, s * roadZ, 0, s * (edge + 2), 10) -- até a entrada da zona
+	end
+	path(-250, 0, -W.ZoneSize.X / 2 - 2, 0, 10) -- do spawn até a zona
+	block(-250, 0, 30, 30)
+
+	-- montanhas nas bordas
+	local hills = {
+		V(-275, -12, -275), V(275, -12, -275), V(-275, -12, 275), V(275, -12, 275),
+		V(-300, -16, -110), V(300, -16, 110), V(300, -16, -120), V(-300, -16, 120),
+	}
+	for _, pos in ipairs(hills) do
+		local radius = rng:NextNumber(38, 52)
+		terrain:FillBall(pos, radius, M.Rock)
+		terrain:FillBall(pos + V(0, -radius * 0.25, 0), radius * 0.95, M.Grass)
+		terrain:FillBall(pos + V(0, radius * 0.75, 0), radius * 0.3, M.Snow)
+		block(pos.X, pos.Z, radius * 2, radius * 2)
+	end
+end
+
+---------------------------------------------------------------------
+-- Decoração
+---------------------------------------------------------------------
+local function roundTree(parent, pos: Vector3)
+	local height = rng:NextNumber(9, 15)
+	cyl(parent, rng:NextNumber(1.6, 2.4), height, pos + V(0, height / 2, 0), RGB(110, 75, 45), M.Wood)
+	local green = RGB(rng:NextInteger(50, 80), rng:NextInteger(140, 185), rng:NextInteger(45, 75))
+	local size = rng:NextNumber(8, 11)
+	ball(parent, size, pos + V(0, height + size * 0.25, 0), green, M.Grass)
+	ball(parent, size * 0.7, pos + V(size * 0.35, height - 0.5, size * 0.1), green, M.Grass)
+	ball(parent, size * 0.7, pos + V(-size * 0.3, height, -size * 0.25), green, M.Grass)
+end
+
+local function pineTree(parent, pos: Vector3)
+	local height = rng:NextNumber(4, 6)
+	cyl(parent, 1.4, height, pos + V(0, height / 2, 0), RGB(100, 65, 40), M.Wood)
+	local green = RGB(40, rng:NextInteger(110, 140), 60)
+	local y = height
+	for i = 0, 3 do
+		local d = 9 - i * 2
+		cyl(parent, d, 2.2, pos + V(0, y + 1.1, 0), green, M.Grass).CanCollide = false
+		y += 2
+	end
+end
+
+local function flowers(parent, center: Vector3, count: number)
+	local colors = { RGB(255, 90, 120), RGB(255, 220, 60), RGB(255, 255, 255), RGB(170, 110, 255), RGB(255, 150, 60) }
+	local color = colors[rng:NextInteger(1, #colors)]
+	for _ = 1, count do
+		local pos = center + V(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
+		part(parent, {
+			Size = V(0.15, 0.8, 0.15), CFrame = CFrame.new(pos + V(0, 0.4, 0)), Color = RGB(60, 140, 50),
+			CanCollide = false, CastShadow = false,
+		})
+		ball(parent, 0.6, pos + V(0, 0.9, 0), color).CastShadow = false
+	end
+end
+
+local function rock(parent, pos: Vector3)
+	local size = V(rng:NextNumber(2, 5), rng:NextNumber(1.5, 3.5), rng:NextNumber(2, 5))
 	part(parent, {
-		Name = "Trunk", Shape = Enum.PartType.Cylinder, Size = Vector3.new(height, 2, 2),
-		CFrame = CFrame.new(pos + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(105, 70, 40), Material = Enum.Material.Wood,
-	})
-	local leafSize = math.random(7, 10)
-	part(parent, {
-		Name = "Leaves", Shape = Enum.PartType.Ball, Size = Vector3.one * leafSize,
-		CFrame = CFrame.new(pos + Vector3.new(0, height + leafSize / 3, 0)),
-		Color = Color3.fromRGB(math.random(40, 70), math.random(140, 180), math.random(40, 70)),
-		Material = Enum.Material.Grass,
+		Size = size, CFrame = CFrame.new(pos + V(0, size.Y / 2 - 0.4, 0))
+			* CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, 6.28), rng:NextNumber(-0.3, 0.3)),
+		Color = RGB(130, 125, 120), Material = M.Slate,
 	})
 end
 
+local function lamp(parent, pos: Vector3)
+	cyl(parent, 0.6, 9, pos + V(0, 4.5, 0), RGB(50, 50, 55), M.Metal)
+	local light = ball(parent, 1.4, pos + V(0, 9.5, 0), RGB(255, 235, 170), M.Neon)
+	local pointLight = Instance.new("PointLight")
+	pointLight.Color = RGB(255, 220, 160)
+	pointLight.Range = 22
+	pointLight.Brightness = 1.5
+	pointLight.Parent = light
+end
+
+local function fence(parent, x1, z1, x2, z2, gapCenter: number?, gapSize: number)
+	local dir = V(x2 - x1, 0, z2 - z1)
+	local length = dir.Magnitude
+	local unit = dir.Unit
+	local start = V(x1, 0, z1)
+	local wood = RGB(150, 105, 65)
+	local function segment(a: number, b: number)
+		if b - a < 1 then
+			return
+		end
+		local mid = start + unit * ((a + b) / 2)
+		local cf = CFrame.lookAt(mid, mid + unit)
+		for _, y in ipairs({ 1.3, 2.5 }) do
+			part(parent, { Size = V(0.3, 0.35, b - a), CFrame = cf + V(0, y, 0), Color = wood, Material = M.WoodPlanks })
+		end
+		local d = a
+		while d <= b do
+			local p = start + unit * d
+			part(parent, { Size = V(0.6, 3.2, 0.6), CFrame = CFrame.new(p + V(0, 1.6, 0)), Color = wood, Material = M.Wood })
+			d += 8
+		end
+	end
+	if gapCenter then
+		segment(0, gapCenter - gapSize / 2)
+		segment(gapCenter + gapSize / 2, length)
+	else
+		segment(0, length)
+	end
+end
+
+local function arch(parent, pos: Vector3, facing: Vector3)
+	local cf = CFrame.lookAt(pos, pos + facing)
+	local stone = RGB(200, 190, 175)
+	for _, s in ipairs({ -1, 1 }) do
+		part(parent, { Size = V(2, 13, 2), CFrame = cf * CFrame.new(s * 8, 6.5, 0), Color = stone, Material = M.Brick })
+		ball(parent, 2.2, (cf * CFrame.new(s * 8, 13.5, 0)).Position, RGB(255, 210, 60), M.Neon)
+	end
+	local beam = part(parent, {
+		Size = V(20, 3.5, 1.2), CFrame = cf * CFrame.new(0, 11.5, 0), Color = RGB(70, 45, 30), Material = M.Wood,
+	})
+	textOn(beam, "🏏 ZONA DE CAÇA 🏏", RGB(255, 230, 90), { Enum.NormalId.Front, Enum.NormalId.Back })
+end
+
+local function statue(parent, center: Vector3)
+	local def = Config.getBrainrot("TungTung") or Config.Brainrots[1]
+	cyl(parent, 14, 2, center + V(0, 1, 0), RGB(190, 185, 175), M.Marble)
+	cyl(parent, 11, 2, center + V(0, 3, 0), RGB(210, 205, 195), M.Marble)
+	local plaque = part(parent, {
+		Size = V(8, 1.6, 0.4), CFrame = CFrame.new(center + V(0, 2.6, -5.6)), Color = RGB(255, 205, 60), Material = M.Metal,
+	})
+	textOn(plaque, def.name, RGB(60, 40, 10), { Enum.NormalId.Front })
+	local model = BrainrotModels.build(def, 2.2)
+	local hip = model:GetAttribute("HipHeight") or 3
+	model:PivotTo(CFrame.new(center + V(0, 4 + hip, 0)) * CFrame.Angles(0, math.pi, 0))
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CanQuery = false
+		end
+	end
+	model.Name = "Statue"
+	model.Parent = parent
+end
+
+local function setupLighting()
+	Lighting.ClockTime = 14.5
+	Lighting.Brightness = 3
+	Lighting.GlobalShadows = true
+	Lighting.OutdoorAmbient = RGB(150, 150, 165)
+	Lighting.EnvironmentDiffuseScale = 1
+	Lighting.EnvironmentSpecularScale = 1
+
+	local function effect(className: string, props)
+		local old = Lighting:FindFirstChild("Brainrot" .. className)
+		if old then
+			old:Destroy()
+		end
+		local e = Instance.new(className)
+		e.Name = "Brainrot" .. className
+		for k, v in pairs(props) do
+			e[k] = v
+		end
+		e.Parent = Lighting
+	end
+	effect("Atmosphere", {
+		Density = 0.28, Offset = 0.2, Color = RGB(200, 225, 255), Decay = RGB(110, 145, 190), Glare = 0.2, Haze = 1,
+	})
+	effect("BloomEffect", { Intensity = 0.4, Size = 24, Threshold = 1.6 })
+	effect("ColorCorrectionEffect", { Saturation = 0.18, Contrast = 0.06, Brightness = 0.02 })
+	effect("SunRaysEffect", { Intensity = 0.06, Spread = 0.8 })
+end
+
+---------------------------------------------------------------------
+-- Construir tudo
+---------------------------------------------------------------------
 function WorldBuilder.build()
 	if not Config.BuildMap then
 		return
@@ -3902,72 +4373,92 @@ function WorldBuilder.build()
 	if workspace:FindFirstChild("Map") then
 		workspace.Map:Destroy()
 	end
-
 	local map = Instance.new("Folder")
 	map.Name = "Map"
 	map.Parent = workspace
 
-	-- remove a Baseplate padrão, se existir
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
 		baseplate:Destroy()
 	end
 
-	-- CHÃO
-	part(map, {
-		Name = "Ground", Size = Vector3.new(620, 4, 620), CFrame = CFrame.new(0, -2, 0),
-		Color = Color3.fromRGB(110, 170, 90), Material = Enum.Material.Grass,
-	})
+	buildTerrain()
+	setupLighting()
 
-	-- ZONA DE CAÇA
-	local zone = Config.Wild
-	local center = zone.ZoneCenter
-	part(map, {
-		Name = "HuntZone", Size = Vector3.new(zone.ZoneSize.X, 1, zone.ZoneSize.Y),
-		CFrame = CFrame.new(center.X, zone.GroundY - 0.45, center.Z),
-		Color = Color3.fromRGB(70, 140, 60), Material = Enum.Material.Grass,
-	})
+	local W = Config.Wild
+	local c = W.ZoneCenter
+	local hx, hz = W.ZoneSize.X / 2, W.ZoneSize.Y / 2
+	local decor = Instance.new("Folder")
+	decor.Name = "Decoracao"
+	decor.Parent = map
 
-	-- cerquinha (postes) em volta da zona
-	local halfX, halfZ = zone.ZoneSize.X / 2, zone.ZoneSize.Y / 2
-	local step = 10
-	for x = -halfX, halfX, step do
-		for _, z in ipairs({ -halfZ, halfZ }) do
-			if math.abs(x) > 12 then -- deixa uma entrada no meio
-				part(map, {
-					Name = "Post", Size = Vector3.new(1, 3, 1), CFrame = CFrame.new(center.X + x, 1.5, center.Z + z),
-					Color = Color3.fromRGB(150, 110, 70), Material = Enum.Material.Wood,
-				})
+	-- cerca da zona de caça com entradas no meio de cada lado
+	local gap = 20
+	fence(map, c.X - hx, c.Z - hz, c.X + hx, c.Z - hz, hx, gap)
+	fence(map, c.X - hx, c.Z + hz, c.X + hx, c.Z + hz, hx, gap)
+	fence(map, c.X - hx, c.Z - hz, c.X - hx, c.Z + hz, hz, gap)
+	fence(map, c.X + hx, c.Z - hz, c.X + hx, c.Z + hz, hz, gap)
+	arch(map, V(c.X, 0, c.Z + hz), V(0, 0, 1))
+	arch(map, V(c.X, 0, c.Z - hz), V(0, 0, -1))
+	arch(map, V(c.X - hx, 0, c.Z), V(-1, 0, 0))
+	arch(map, V(c.X + hx, 0, c.Z), V(1, 0, 0))
+
+	-- estátua do Tung Tung no meio da zona
+	statue(map, V(c.X, W.GroundY, c.Z))
+
+	-- dentro da zona: árvores, flores e pedras (longe do centro)
+	for _ = 1, 22 do
+		local x, z = c.X + rng:NextNumber(-hx + 8, hx - 8), c.Z + rng:NextNumber(-hz + 8, hz - 8)
+		if V(x - c.X, 0, z - c.Z).Magnitude > 22 then
+			if rng:NextNumber() < 0.6 then
+				roundTree(decor, V(x, W.GroundY, z))
+			else
+				pineTree(decor, V(x, W.GroundY, z))
 			end
 		end
 	end
-	for z = -halfZ + step, halfZ - step, step do
-		for _, x in ipairs({ -halfX, halfX }) do
-			if math.abs(z) > 12 then
-				part(map, {
-					Name = "Post", Size = Vector3.new(1, 3, 1), CFrame = CFrame.new(center.X + x, 1.5, center.Z + z),
-					Color = Color3.fromRGB(150, 110, 70), Material = Enum.Material.Wood,
-				})
+	for _ = 1, 30 do
+		local x, z = c.X + rng:NextNumber(-hx + 4, hx - 4), c.Z + rng:NextNumber(-hz + 4, hz - 4)
+		if V(x - c.X, 0, z - c.Z).Magnitude > 12 then
+			flowers(decor, V(x, W.GroundY, z), rng:NextInteger(4, 8))
+		end
+	end
+	for _ = 1, 10 do
+		local x, z = c.X + rng:NextNumber(-hx + 6, hx - 6), c.Z + rng:NextNumber(-hz + 6, hz - 6)
+		if V(x - c.X, 0, z - c.Z).Magnitude > 14 then
+			rock(decor, V(x, W.GroundY, z))
+		end
+	end
+
+	-- fora da zona: floresta em volta da ilha (sem cobrir bases e caminhos)
+	local half = ISLAND / 2 - 8
+	local placed = 0
+	for _ = 1, 600 do
+		if placed >= 90 then
+			break
+		end
+		local x, z = rng:NextNumber(-half, half), rng:NextNumber(-half, half)
+		if isFree(x, z, 6) then
+			placed += 1
+			local roll = rng:NextNumber()
+			if roll < 0.45 then
+				roundTree(decor, V(x, 0, z))
+			elseif roll < 0.8 then
+				pineTree(decor, V(x, 0, z))
+			elseif roll < 0.92 then
+				flowers(decor, V(x, 0, z), rng:NextInteger(5, 9))
+			else
+				rock(decor, V(x, 0, z))
 			end
 		end
 	end
 
-	-- árvores dentro da zona
-	local rng = Random.new(42)
-	for _ = 1, 18 do
-		local pos = Vector3.new(
-			center.X + rng:NextNumber(-halfX + 10, halfX - 10),
-			zone.GroundY,
-			center.Z + rng:NextNumber(-halfZ + 10, halfZ - 10)
-		)
-		if pos.Magnitude > 20 then
-			tree(map, pos)
+	-- postes de luz na estrada
+	for _, s in ipairs({ -1, 1 }) do
+		for x = -130, 130, 40 do
+			lamp(map, V(x, 0, s * 136 + s * 7))
 		end
 	end
-
-	-- placas
-	sign(map, CFrame.new(center.X, 8, center.Z + halfZ + 4), "🏏 ZONA DE CAÇA 🏏", Color3.fromRGB(255, 230, 80))
-	sign(map, CFrame.new(center.X, 8, center.Z - halfZ - 4) * CFrame.Angles(0, math.rad(180), 0), "🏏 ZONA DE CAÇA 🏏", Color3.fromRGB(255, 230, 80))
 
 	-- SPAWN
 	local spawnLocation = workspace:FindFirstChildOfClass("SpawnLocation")
@@ -3976,19 +4467,16 @@ function WorldBuilder.build()
 		spawnLocation.Parent = map
 	end
 	spawnLocation.Anchored = true
-	spawnLocation.Size = Vector3.new(12, 1, 12)
+	spawnLocation.Size = V(14, 1, 14)
 	spawnLocation.CFrame = CFrame.new(-250, 0.5, 0)
+	spawnLocation.Material = M.Marble
+	spawnLocation.Color = RGB(240, 240, 240)
 	spawnLocation.Neutral = true
 	spawnLocation.Duration = 3
-
-	-- iluminação mais bonita
-	Lighting.ClockTime = 14
-	Lighting.Brightness = 2.5
-	Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 150)
 end
 
 return WorldBuilder
-]]></ProtectedString></Properties></Item></Item></Item></Item><Item class="StarterPlayer" referent="RBX00000000000000000000000000000017"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX00000000000000000000000000000016"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX00000000000000000000000000000015"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX00000000000000000000000000000014"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Interface do jogador + arremesso da bola.
+]]></ProtectedString></Properties></Item></Item></Item></Item><Item class="StarterPlayer" referent="RBX00000000000000000000000000000018"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX00000000000000000000000000000017"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX00000000000000000000000000000016"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX00000000000000000000000000000015"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Interface do jogador + arremesso da bola.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -4591,7 +5079,7 @@ CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance, level)
 	local rarity = Config.getRarity(def.rarity)
 	if success then
 		showBig("✨ CAPTUROU! ✨\n" .. def.name .. " Lv." .. (level or 1) .. " (" .. rarity.display .. ")", rarity.color)
-		toast("Coloque ele em um pedestal 🏠 ou escolha como parceiro ⚔ no menu 🎒", GREEN)
+		toast("Ele está na sua barra de itens! Segure ele e clique perto de um pedestal da sua base 🏠", GREEN)
 	else
 		showBig("💨 Escapou! 💨\nChance era " .. math.floor(chance * 100) .. "% — bata mais nele!", RED)
 	end

@@ -77,8 +77,49 @@ local function buildPlot(index: number, info)
 
 	part(model, {
 		Name = "Base", Size = Vector3.new(T.PlotSize, 1, T.PlotSize), CFrame = cf * CFrame.new(0, 0.5, 0),
-		Color = Color3.fromRGB(225, 225, 225), Material = Enum.Material.SmoothPlastic,
+		Color = Color3.fromRGB(230, 225, 215), Material = Enum.Material.Concrete,
 	})
+	-- piso de madeira
+	part(model, {
+		Name = "Floor", Size = Vector3.new(T.PlotSize - 8, 0.2, T.PlotSize - 14), CFrame = cf * CFrame.new(0, 1.05, -3),
+		Color = Color3.fromRGB(205, 160, 110), Material = Enum.Material.WoodPlanks,
+	})
+	-- muretas nos lados e atrás (a frente fica aberta)
+	local half = T.PlotSize / 2
+	local walls = {
+		{ Vector3.new(T.PlotSize, 3, 1), CFrame.new(0, 2.5, -half + 0.5) },
+		{ Vector3.new(1, 3, T.PlotSize), CFrame.new(-half + 0.5, 2.5, 0) },
+		{ Vector3.new(1, 3, T.PlotSize), CFrame.new(half - 0.5, 2.5, 0) },
+	}
+	for _, w in ipairs(walls) do
+		part(model, { Name = "Wall", Size = w[1], CFrame = cf * w[2], Color = Color3.fromRGB(235, 230, 220), Material = Enum.Material.Brick })
+		part(model, {
+			Name = "WallCap", Size = w[1] + Vector3.new(0.4, -2.6, 0.4), CFrame = cf * w[2] * CFrame.new(0, 1.7, 0),
+			Color = color, Material = Enum.Material.SmoothPlastic,
+		})
+	end
+	-- arbustos nas muretas e postes de luz na frente
+	for _, x in ipairs({ -33, -25, 25, 33 }) do
+		local bush = part(model, {
+			Name = "Bush", Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = cf * CFrame.new(x, 2.5, -half + 3),
+			Color = Color3.fromRGB(70, 155, 65), Material = Enum.Material.Grass, CanCollide = false,
+		})
+		bush.CastShadow = false
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		part(model, {
+			Name = "LampPost", Size = Vector3.new(0.6, 9, 0.6), CFrame = cf * CFrame.new(s * (half - 2), 5.5, half - 2),
+			Color = Color3.fromRGB(50, 50, 55), Material = Enum.Material.Metal,
+		})
+		local bulb = part(model, {
+			Name = "Lamp", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.6, CFrame = cf * CFrame.new(s * (half - 2), 10.5, half - 2),
+			Color = color, Material = Enum.Material.Neon, CanCollide = false,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 18
+		light.Parent = bulb
+	end
 	-- borda colorida
 	part(model, {
 		Name = "Border", Size = Vector3.new(T.PlotSize + 2, 0.8, T.PlotSize + 2), CFrame = cf * CFrame.new(0, 0.3, 0),
@@ -142,7 +183,14 @@ local function buildPlot(index: number, info)
 			local slotCF = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT / 2, z)
 			local pedestal = part(model, {
 				Name = "Pedestal" .. n, Shape = Enum.PartType.Cylinder, Size = Vector3.new(PEDESTAL_HEIGHT, 8, 8),
-				CFrame = slotCF * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(90, 90, 100),
+				CFrame = slotCF * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(235, 235, 240),
+				Material = Enum.Material.Marble,
+			})
+			-- anel colorido em cima (muda de cor com a raridade)
+			local ring = part(model, {
+				Name = "PedestalRing" .. n, Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, 7, 7),
+				CFrame = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT + 0.05, z) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(90, 90, 100), CanCollide = false,
 			})
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.RequiresLineOfSight = false
@@ -154,6 +202,7 @@ local function buildPlot(index: number, info)
 			local slot = {
 				index = n,
 				part = pedestal,
+				ring = ring,
 				topCF = cf * CFrame.new(x, BASE_TOP + PEDESTAL_HEIGHT, z) * CFrame.Angles(0, math.pi, 0),
 				prompt = prompt,
 				label = billboard(pedestal, 6, 200, 50),
@@ -208,9 +257,13 @@ local function refreshSlot(plot, slot)
 	local data = owner and DataService.get(owner)
 	local prompt = slot.prompt
 
+	local function setRing(color: Color3, glowing: boolean)
+		slot.ring.Color = color
+		slot.ring.Material = if glowing then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	end
+
 	if not data then
-		slot.part.Color = Color3.fromRGB(90, 90, 100)
-		slot.part.Material = Enum.Material.SmoothPlastic
+		setRing(Color3.fromRGB(90, 90, 100), false)
 		slot.label.Text = ""
 		prompt.Enabled = false
 		return
@@ -218,8 +271,7 @@ local function refreshSlot(plot, slot)
 
 	if slot.index > data.unlockedSlots then
 		local price = T.SlotPrices[slot.index] or 0
-		slot.part.Color = Color3.fromRGB(70, 70, 75)
-		slot.part.Material = Enum.Material.SmoothPlastic
+		setRing(Color3.fromRGB(70, 70, 75), false)
 		if slot.index == data.unlockedSlots + 1 then
 			slot.label.Text = "🔒 Desbloquear\n<font color=\"#7CFF7C\">$" .. fmt(price) .. "</font>"
 			prompt.ActionText = "Desbloquear"
@@ -233,13 +285,12 @@ local function refreshSlot(plot, slot)
 	end
 
 	local item = itemInSlot(data, slot.index)
-	slot.part.Material = Enum.Material.Neon
 	if item then
 		local def = Config.getBrainrot(item.id)
 		local rarity = Config.getRarity(def.rarity)
 		local level = item.level or 1
 		local name = Stats.displayName(def, level)
-		slot.part.Color = rarity.color
+		setRing(rarity.color, true)
 
 		local model = BrainrotModels.build(def, 0.9 * Stats.scale(level), Stats.stage(level))
 		local hip = model:GetAttribute("HipHeight") or def.size.Y / 2
@@ -252,8 +303,8 @@ local function refreshSlot(plot, slot)
 		prompt.ObjectText = name
 		prompt.Enabled = true
 	else
-		slot.part.Color = Color3.fromRGB(180, 180, 190)
-		slot.label.Text = "Vazio"
+		setRing(Color3.fromRGB(200, 230, 255), true)
+		slot.label.Text = "Vazio\n<font size=\"14\">segure um brainrot e clique</font>"
 		prompt.ActionText = "Colocar Brainrot"
 		prompt.ObjectText = "Pedestal " .. slot.index
 		prompt.Enabled = true
@@ -446,7 +497,11 @@ function TycoonService.onSlotPrompt(player: Player, plot, slot)
 		if item then
 			ok, msg = TycoonService.store(player, item.uid)
 		else
-			ok, msg = TycoonService.place(player, nil, slot.index)
+			-- se estiver segurando um brainrot, coloca ele; senão coloca o que dá mais dinheiro
+			local character = player.Character
+			local held = character and character:FindFirstChildOfClass("Tool")
+			local heldUid = held and held:GetAttribute("BrainrotUid")
+			ok, msg = TycoonService.place(player, heldUid, slot.index)
 		end
 	end
 	if msg then
@@ -503,6 +558,26 @@ function TycoonService.release(player: Player)
 	plot.stored = 0
 	refreshPlot(plot)
 	updateCollectorLabel(plot)
+end
+
+-- Pedestal vazio (e desbloqueado) mais perto de uma posição, na base do jogador
+function TycoonService.findFreeSlotNear(player: Player, position: Vector3, maxDistance: number): number?
+	local plot = plotByPlayer[player]
+	local data = DataService.get(player)
+	if not plot or not data then
+		return nil
+	end
+	local best, bestDist = nil, maxDistance
+	for i = 1, math.min(data.unlockedSlots, #plot.slots) do
+		if not itemInSlot(data, i) then
+			local offset = plot.slots[i].topCF.Position - position
+			local dist = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if dist <= bestDist then
+				best, bestDist = i, dist
+			end
+		end
+	end
+	return best
 end
 
 function TycoonService.teleportHome(player: Player)

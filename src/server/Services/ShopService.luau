@@ -10,6 +10,7 @@ local DataService = require(script.Parent.DataService)
 local TycoonService = require(script.Parent.TycoonService)
 local ToolService = require(script.Parent.ToolService)
 local CompanionService = require(script.Parent.CompanionService)
+local InventoryService = require(script.Parent.InventoryService)
 local Stats = require(ReplicatedStorage.Shared.Stats)
 local Remotes = require(script.Parent.Remotes)
 
@@ -63,6 +64,7 @@ function actions.BuyBat(player, batId)
 	end
 	data.bat = batId
 	ToolService.giveTools(player)
+	InventoryService.sync(player, true)
 	DataService.pushUpdate(player)
 	return true, batDef.name .. " equipado!"
 end

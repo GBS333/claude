@@ -601,7 +601,7 @@ CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance, level)
 	local rarity = Config.getRarity(def.rarity)
 	if success then
 		showBig("✨ CAPTUROU! ✨\n" .. def.name .. " Lv." .. (level or 1) .. " (" .. rarity.display .. ")", rarity.color)
-		toast("Coloque ele em um pedestal 🏠 ou escolha como parceiro ⚔ no menu 🎒", GREEN)
+		toast("Ele está na sua barra de itens! Segure ele e clique perto de um pedestal da sua base 🏠", GREEN)
 	else
 		showBig("💨 Escapou! 💨\nChance era " .. math.floor(chance * 100) .. "% — bata mais nele!", RED)
 	end

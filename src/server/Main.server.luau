@@ -11,6 +11,7 @@ local TycoonService = require(Services.TycoonService)
 local WildService = require(Services.WildService)
 local ToolService = require(Services.ToolService)
 local CompanionService = require(Services.CompanionService)
+local InventoryService = require(Services.InventoryService)
 local ShopService = require(Services.ShopService)
 
 WorldBuilder.build()
@@ -18,6 +19,7 @@ TycoonService.start()
 WildService.start()
 ToolService.start()
 CompanionService.start()
+InventoryService.start()
 ShopService.start()
 
 local function onCharacter(player: Player, character: Model)
@@ -29,6 +31,7 @@ local function onCharacter(player: Player, character: Model)
 		return
 	end
 	ToolService.giveTools(player)
+	InventoryService.sync(player, true) -- brainrots capturados na barra de itens
 	TycoonService.teleportHome(player)
 	task.wait(0.1)
 	CompanionService.spawn(player) -- seu parceiro aparece do seu lado

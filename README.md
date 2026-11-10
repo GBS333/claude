@@ -15,7 +15,9 @@ para ganhar dinheiro por segundo.
    - Se a vida **zerar**, ele **desmaia e foge** (você ganha só um pouquinho de dinheiro).
    - Se ele escapar da bola, fica bravo de novo e a vida continua baixa. Tente outra vez!
    - Depois de alguns segundos sem apanhar, ele **regenera** a vida.
-4. Volte para a base (botão **🏠 Base**) e use o pedestal (segure **E**) para **colocar** o brainrot.
+4. O brainrot capturado aparece na sua **barra de itens** (embaixo da tela). Volte para a base (botão **🏠 Base**),
+   **segure ele** e **clique** perto de um pedestal vazio para colocar (ou segure **E** no pedestal).
+   Para tirar do pedestal, segure **E** nele e ele volta para a barra de itens.
 5. Cada brainrot no pedestal gera **$ por segundo**. Pise no **coletor verde** para pegar o dinheiro.
 6. Use o dinheiro na **🛒 Loja**: bolas melhores, tacos mais fortes e mais pedestais.
 7. No menu **🎒 Brainrots**, aperte **⚔ Lutar** para escolher um **parceiro** (veja abaixo).
@@ -83,7 +85,9 @@ Vida e renda abaixo são no **nível 1** (aumentam com o nível).
 
 ## Como colocar no Roblox Studio
 
-O servidor **constrói o mapa sozinho** (chão, zona de caça, árvores e 6 bases), então você só precisa colocar os scripts.
+O servidor **constrói o mapa sozinho** quando você aperta Play: uma ilha de terreno com mar e praia, montanhas,
+caminhos de pedra, floresta, flores, a Zona de Caça cercada com 4 portais e uma estátua do Tung Tung no meio,
+6 bases com piso de madeira, muretas e postes de luz. Então você só precisa colocar os scripts.
 
 ### Jeito mais fácil: abrir o arquivo pronto
 
@@ -123,6 +127,7 @@ ServerScriptService
         ├── WildService   (ModuleScript)  ← src/server/Services/WildService.luau
         ├── TycoonService (ModuleScript)  ← src/server/Services/TycoonService.luau
         ├── CompanionService (ModuleScript) ← src/server/Services/CompanionService.luau
+        ├── InventoryService (ModuleScript) ← src/server/Services/InventoryService.luau
         ├── ToolService   (ModuleScript)  ← src/server/Services/ToolService.luau
         └── ShopService   (ModuleScript)  ← src/server/Services/ShopService.luau
 
@@ -201,8 +206,9 @@ Tudo fica em **`src/shared/Config.luau`**:
 | `shared/Stats` | Vida/força/renda por nível, evoluções, XP e ataques aprendidos |
 | `server/Main` | Liga tudo e cuida de entrada/saída de jogadores |
 | `DataService` | Salva/carrega dados (DataStore) e o placar (leaderstats) |
-| `WorldBuilder` | Constrói o mapa |
+| `WorldBuilder` | Constrói o mapa (terreno, decoração, cerca, portais, estátua, iluminação) |
 | `WildService` | Brainrots selvagens: spawn, IA, vida, ataque, regeneração, desmaio |
+| `InventoryService` | Brainrots capturados viram itens na barra para segurar e colocar no pedestal |
 | `CompanionService` | Parceiro: seguir, lutar, ataques especiais, desmaio, XP, nível e evolução |
 | `ToolService` | Taco (golpe) e Bola (arremesso em arco + tentativa de captura com sacudidas) |
 | `TycoonService` | Bases, pedestais, renda passiva e coletor |

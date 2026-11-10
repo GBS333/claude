@@ -192,6 +192,15 @@ function DataService.pushUpdate(player: Player)
 	end
 	updateLeaderstats(player, data)
 	Remotes.DataUpdated:FireClient(player, DataService.snapshot(player))
+	for _, callback in ipairs(DataService.updateListeners) do
+		task.spawn(callback, player)
+	end
+end
+
+-- Outros sistemas podem pedir para ser avisados quando os dados mudam
+DataService.updateListeners = {}
+function DataService.onUpdate(callback)
+	table.insert(DataService.updateListeners, callback)
 end
 
 ---------------------------------------------------------------------
