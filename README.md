@@ -85,7 +85,16 @@ Vida e renda abaixo são no **nível 1** (aumentam com o nível).
 
 O servidor **constrói o mapa sozinho** (chão, zona de caça, árvores e 6 bases), então você só precisa colocar os scripts.
 
-### Opção A: com Rojo (recomendado)
+### Jeito mais fácil: abrir o arquivo pronto
+
+1. Baixe o arquivo **`BrainrotTycoon.rbxlx`** (na página do repositório no GitHub, clique nele e depois em
+   **Download raw file**).
+2. Dê dois cliques nele (ou, no Roblox Studio, **File → Open from File...**).
+3. Aperte **Play** (F5).
+
+> Mudou algum script na pasta `src`? Gere o arquivo de novo com `python3 tools/build_place.py`.
+
+### Opção A: com Rojo
 
 1. Instale o [Rojo](https://rojo.space/) (extensão do VS Code ou `aftman`/`rokit`) e o plugin do Rojo no Studio.
 2. Nesta pasta, rode `rojo serve`.
