@@ -9,11 +9,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CatchMath = require(ReplicatedStorage.Shared.CatchMath)
+local Stats = require(ReplicatedStorage.Shared.Stats)
 local BrainrotModels = require(script.Parent.BrainrotModels)
 local DataService = require(script.Parent.DataService)
 local Remotes = require(script.Parent.Remotes)
 
 local WildService = {}
+
+-- Ganchos preenchidos pelo CompanionService (evita require circular)
+WildService.onDefeated = nil -- function(state, player)
+WildService.onPlayerAttacked = nil -- function(player, state)
 
 local WILD = Config.Wild
 local folder = Instance.new("Folder")
@@ -87,7 +92,7 @@ local function createBillboard(state)
 	local name = Instance.new("TextLabel")
 	name.Size = UDim2.new(1, 0, 0, 20)
 	name.BackgroundTransparency = 1
-	name.Text = def.name
+	name.Text = def.name .. "  Lv." .. state.level
 	name.TextColor3 = Color3.new(1, 1, 1)
 	name.TextStrokeTransparency = 0.3
 	name.Font = Enum.Font.FredokaOne
@@ -140,7 +145,7 @@ local function createBillboard(state)
 end
 
 local function updateHealthBar(state)
-	local ratio = math.clamp(state.health / state.def.maxHealth, 0, 1)
+	local ratio = math.clamp(state.health / state.maxHealth, 0, 1)
 	state.fill.Size = UDim2.fromScale(ratio, 1)
 	if ratio > 0.5 then
 		state.fill.BackgroundColor3 = Color3.fromRGB(80, 220, 80)
@@ -149,7 +154,7 @@ local function updateHealthBar(state)
 	else
 		state.fill.BackgroundColor3 = Color3.fromRGB(240, 60, 60)
 	end
-	state.hpText.Text = math.ceil(state.health) .. " / " .. state.def.maxHealth
+	state.hpText.Text = math.ceil(state.health) .. " / " .. state.maxHealth
 	state.model:SetAttribute("Health", state.health)
 end
 
@@ -186,6 +191,8 @@ local function floatingText(position: Vector3, text: string, color: Color3)
 	TweenService:Create(label, TweenInfo.new(0.9), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 	Debris:AddItem(anchor, 1)
 end
+
+WildService.floatingText = floatingText
 
 function WildService.poof(position: Vector3, color: Color3)
 	local p = Instance.new("Part")
@@ -225,11 +232,17 @@ end
 ---------------------------------------------------------------------
 local function spawnOne()
 	local def = pickRandomDef()
+	local range = Config.getRarity(def.rarity).wildLevels or { 1, 1 }
+	local level = rng:NextInteger(range[1], range[2])
+	local maxHealth = Stats.maxHealth(def, level, 1)
 	local model = BrainrotModels.build(def, 1)
 	local state = {
 		def = def,
 		model = model,
-		health = def.maxHealth,
+		level = level,
+		maxHealth = maxHealth,
+		power = Stats.power(def, level, 1),
+		health = maxHealth,
 		position = randomZonePoint(),
 		yaw = rng:NextNumber(0, math.pi * 2),
 		target = nil,
@@ -237,6 +250,7 @@ local function spawnOne()
 		lastDamage = 0,
 		lastAttack = 0,
 		aggroPlayer = nil,
+		aggroCompanion = nil,
 		aggroUntil = 0,
 		capturing = false,
 		hipHeight = model:GetAttribute("HipHeight") or def.size.Y / 2,
@@ -250,8 +264,9 @@ local function spawnOne()
 	end
 
 	model:SetAttribute("BrainrotId", def.id)
-	model:SetAttribute("MaxHealth", def.maxHealth)
-	model:SetAttribute("Health", def.maxHealth)
+	model:SetAttribute("Level", level)
+	model:SetAttribute("MaxHealth", maxHealth)
+	model:SetAttribute("Health", maxHealth)
 	model:PivotTo(CFrame.new(state.position + Vector3.new(0, state.hipHeight, 0)) * CFrame.Angles(0, state.yaw, 0))
 	model.Parent = folder
 	createBillboard(state)
@@ -278,12 +293,12 @@ local function faint(state, player: Player?)
 	WildService.poof(state.model:GetPivot().Position, rarity.color)
 	despawn(state)
 	if player then
-		DataService.addCash(player, rarity.faintReward)
-		Remotes.notify(
-			player,
-			def.name .. " desmaiou e fugiu! +$" .. rarity.faintReward .. "  (Dica: deixe com POUCA vida e jogue a bola!)",
-			Color3.fromRGB(255, 170, 60)
-		)
+		local reward = math.floor(rarity.faintReward * (1 + 0.25 * (state.level - 1)))
+		DataService.addCash(player, reward)
+		Remotes.notify(player, def.name .. " Lv." .. state.level .. " foi derrotado! +$" .. reward, Color3.fromRGB(255, 170, 60))
+		if WildService.onDefeated then
+			task.spawn(WildService.onDefeated, state, player)
+		end
 	end
 end
 
@@ -329,10 +344,12 @@ function WildService.findTargetInFront(player: Player, range: number)
 	return best
 end
 
-function WildService.damage(state, amount: number, player: Player?)
+-- companion = o parceiro que bateu (ou nil se foi o taco do jogador)
+function WildService.damage(state, amount: number, player: Player?, companion: any?)
 	if not WildService.isAlive(state) or state.capturing then
 		return
 	end
+	amount = math.max(1, math.floor(amount + 0.5))
 	state.health -= amount
 	state.lastDamage = os.clock()
 	flash(state)
@@ -345,23 +362,31 @@ function WildService.damage(state, amount: number, player: Player?)
 	end
 	updateHealthBar(state)
 
-	-- fica bravo e empurra para trás
-	if player then
+	-- fica bravo com quem bateu e é empurrado para trás
+	local sourcePosition
+	if companion and companion:isAlive() then
+		state.aggroCompanion = companion
+		state.aggroPlayer = nil
+		state.aggroUntil = os.clock() + WILD.AggroTime
+		sourcePosition = companion:getPosition()
+	elseif player then
 		state.aggroPlayer = player
+		state.aggroCompanion = nil
 		state.aggroUntil = os.clock() + WILD.AggroTime
 		local character = player.Character
 		local hrp = character and character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local away = flat(state.position - hrp.Position)
-			if away.Magnitude > 0.1 then
-				state.position = clampToZone(state.position + away.Unit * WILD.Knockback)
-			end
+		sourcePosition = hrp and hrp.Position
+	end
+	if sourcePosition then
+		local away = flat(state.position - sourcePosition)
+		if away.Magnitude > 0.1 then
+			state.position = clampToZone(state.position + away.Unit * WILD.Knockback)
 		end
 	end
 end
 
 function WildService.getChance(state, ballMultiplier: number): number
-	return CatchMath.getChance(state.def.catchRate, state.health, state.def.maxHealth, ballMultiplier)
+	return CatchMath.getChance(state.def.catchRate, state.health, state.maxHealth, ballMultiplier)
 end
 
 -- Some/aparece enquanto está dentro da bola
@@ -384,6 +409,7 @@ function WildService.releaseAfterFail(state, player: Player?)
 	WildService.setCapturing(state, false)
 	if player then
 		state.aggroPlayer = player
+		state.aggroCompanion = nil
 		state.aggroUntil = os.clock() + WILD.AggroTime
 	end
 end
@@ -396,12 +422,74 @@ function WildService.getPosition(state): Vector3
 	return state.position
 end
 
+-- Todos os selvagens perto de um ponto (para ataques em área)
+function WildService.getInRadius(position: Vector3, radius: number)
+	local list = {}
+	for _, state in pairs(states) do
+		if not state.capturing then
+			local dist = flat(state.position - position).Magnitude - state.def.size.X / 2
+			if dist <= radius then
+				table.insert(list, state)
+			end
+		end
+	end
+	return list
+end
+
+function WildService.findNearest(position: Vector3, radius: number)
+	local best, bestDist = nil, math.huge
+	for _, state in pairs(states) do
+		if not state.capturing then
+			local dist = flat(state.position - position).Magnitude
+			if dist <= radius and dist < bestDist then
+				best, bestDist = state, dist
+			end
+		end
+	end
+	return best
+end
+
+-- Selvagem que está atacando esse jogador ou o parceiro dele
+function WildService.findAggressor(player: Player, companion: any?, position: Vector3, radius: number)
+	local now = os.clock()
+	local best, bestDist = nil, math.huge
+	for _, state in pairs(states) do
+		if not state.capturing and now <= state.aggroUntil
+			and (state.aggroPlayer == player or (companion and state.aggroCompanion == companion)) then
+			local dist = flat(state.position - position).Magnitude
+			if dist <= radius and dist < bestDist then
+				best, bestDist = state, dist
+			end
+		end
+	end
+	return best
+end
+
+function WildService.getStateFromModel(model: Instance)
+	return states[model]
+end
+
 ---------------------------------------------------------------------
 -- Movimento e IA
 ---------------------------------------------------------------------
+-- Retorna (posição do alvo, função que dá dano) ou nil
 local function getAggroTarget(state)
-	if not state.aggroPlayer or os.clock() > state.aggroUntil then
+	if os.clock() > state.aggroUntil then
 		state.aggroPlayer = nil
+		state.aggroCompanion = nil
+		return nil
+	end
+	local companion = state.aggroCompanion
+	if companion then
+		if companion:isAlive() then
+			return companion:getPosition(), function(amount)
+				companion:takeDamage(amount, state)
+			end
+		end
+		state.aggroCompanion = nil
+		return nil
+	end
+	if not state.aggroPlayer then
 		return nil
 	end
 	local player = state.aggroPlayer
@@ -416,7 +504,12 @@ local function getAggroTarget(state)
 		state.aggroPlayer = nil
 		return nil
 	end
-	return humanoid, hrp
+	return hrp.Position, function(amount)
+		humanoid:TakeDamage(state.def.damage)
+		if WildService.onPlayerAttacked then
+			task.spawn(WildService.onPlayerAttacked, player, state)
+		end
+	end
 end
 
 local function step(state, dt: number, now: number)
@@ -426,21 +519,22 @@ local function step(state, dt: number, now: number)
 	local def = state.def
 
 	-- regenerar
-	if state.health < def.maxHealth and now - state.lastDamage > WILD.RegenDelay then
-		state.health = math.min(def.maxHealth, state.health + def.maxHealth * WILD.RegenPercentPerSecond * dt)
+	if state.health < state.maxHealth and now - state.lastDamage > WILD.RegenDelay then
+		state.health = math.min(state.maxHealth, state.health + state.maxHealth * WILD.RegenPercentPerSecond * dt)
 		updateHealthBar(state)
 	end
 
 	local goal
 	local speed = def.speed
-	local humanoid, hrp = getAggroTarget(state)
-	if humanoid then
-		goal = clampToZone(hrp.Position)
+	local targetPosition, hitTarget = getAggroTarget(state)
+	local chasing = targetPosition ~= nil
+	if targetPosition then
+		goal = clampToZone(targetPosition)
 		speed = def.speed * 1.15
-		local dist = flat(hrp.Position - state.position).Magnitude
+		local dist = flat(targetPosition - state.position).Magnitude
 		if dist <= WILD.AttackRange + def.size.X / 2 and now - state.lastAttack >= WILD.AttackCooldown then
 			state.lastAttack = now
-			humanoid:TakeDamage(def.damage)
+			hitTarget(state.power)
 			state.phase += 2 -- pulinho de ataque
 		end
 	else
@@ -461,13 +555,13 @@ local function step(state, dt: number, now: number)
 	if goal then
 		local offset = flat(goal - state.position)
 		local dist = offset.Magnitude
-		local stopDist = if humanoid then 2.5 else 0.1
+		local stopDist = if chasing then 2.5 else 0.1
 		if dist > stopDist then
 			local dir = offset.Unit
 			state.position = clampToZone(state.position + dir * math.min(speed * dt, dist - stopDist))
 			state.yaw = math.atan2(-dir.X, -dir.Z)
 			moving = true
-		elseif humanoid then
+		elseif chasing and dist > 0.01 then
 			local dir = offset.Unit
 			state.yaw = math.atan2(-dir.X, -dir.Z)
 		end

@@ -9,6 +9,8 @@ local CatchMath = require(ReplicatedStorage.Shared.CatchMath)
 local DataService = require(script.Parent.DataService)
 local TycoonService = require(script.Parent.TycoonService)
 local ToolService = require(script.Parent.ToolService)
+local CompanionService = require(script.Parent.CompanionService)
+local Stats = require(ReplicatedStorage.Shared.Stats)
 local Remotes = require(script.Parent.Remotes)
 
 local ShopService = {}
@@ -88,10 +90,42 @@ function actions.Sell(player, uid)
 		return false, "Brainrot não encontrado."
 	end
 	local def = Config.getBrainrot(item.id)
+	local data = DataService.get(player)
+	if data.companion == uid then
+		CompanionService.dismiss(player)
+	end
+	local price = Stats.sellPrice(def, item.level or 1)
 	DataService.removeBrainrot(player, uid)
 	TycoonService.onItemRemoved(player, item)
-	DataService.addCash(player, def.sellPrice)
-	return true, "Vendeu " .. def.name .. " por $" .. fmt(def.sellPrice) .. "!"
+	DataService.addCash(player, price)
+	return true, "Vendeu " .. Stats.displayName(def, item.level or 1) .. " por $" .. fmt(price) .. "!"
+end
+
+-- escolher o parceiro de batalha (tira do pedestal se precisar)
+function actions.Summon(player, uid)
+	if type(uid) ~= "string" then
+		return false, "Inválido."
+	end
+	local item = DataService.findItem(player, uid)
+	if item and item.slot then
+		TycoonService.store(player, uid)
+	end
+	return CompanionService.summon(player, uid)
+end
+
+function actions.Dismiss(player)
+	return CompanionService.dismiss(player)
+end
+
+function actions.UseMove(player, moveId, targetModel)
+	return CompanionService.useMove(player, moveId, targetModel)
+end
+
+function actions.ToggleAuto(player)
+	local on = player:GetAttribute("AutoBattle") == false
+	player:SetAttribute("AutoBattle", on)
+	DataService.pushUpdate(player)
+	return true, if on then "⚔ Modo automático LIGADO: seu parceiro ataca brainrots perto de você." else "Modo automático DESLIGADO: ele só ataca quem você bater ou quem te atacar."
 end
 
 function actions.Unlock(player)
@@ -111,10 +145,12 @@ function ShopService.start()
 		end
 		-- proteção simples contra spam
 		local now = os.clock()
-		if actionName ~= "GetData" and lastAction[player] and now - lastAction[player] < 0.15 then
+		if actionName ~= "GetData" and actionName ~= "UseMove" and lastAction[player] and now - lastAction[player] < 0.15 then
 			return false, nil
 		end
-		lastAction[player] = now
+		if actionName ~= "UseMove" then
+			lastAction[player] = now
+		end
 
 		if not DataService.get(player) then
 			return false, "Carregando seus dados..."

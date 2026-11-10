@@ -1,7 +1,8 @@
 # 🏏 Brainrot Tycoon: Caça e Captura
 
 Jogo de Roblox onde você **bate nos brainrots com um taco de beisebol**, **captura eles com bolas**
-(quanto **menos vida** o brainrot tiver, **maior a chance** de pegar) e coloca eles na sua **base (tycoon)**
+(quanto **menos vida** o brainrot tiver, **maior a chance** de pegar), **luta usando seus brainrots como parceiros**
+(eles ganham XP, sobem de nível, aprendem ataques e **evoluem**) e coloca eles na sua **base (tycoon)**
 para ganhar dinheiro por segundo.
 
 ## Como jogar
@@ -17,16 +18,44 @@ para ganhar dinheiro por segundo.
 4. Volte para a base (botão **🏠 Base**) e use o pedestal (segure **E**) para **colocar** o brainrot.
 5. Cada brainrot no pedestal gera **$ por segundo**. Pise no **coletor verde** para pegar o dinheiro.
 6. Use o dinheiro na **🛒 Loja**: bolas melhores, tacos mais fortes e mais pedestais.
+7. No menu **🎒 Brainrots**, aperte **⚔ Lutar** para escolher um **parceiro** (veja abaixo).
+
+### ⚔ Parceiro de batalha
+
+- O parceiro **te segue** e **luta contra os brainrots selvagens**. Os selvagens **revidam** e podem nocautear ele.
+- Ele ataca quem você bater com o taco e quem atacar você. Com o **Auto LIGADO**, ataca qualquer selvagem perto de você.
+- Se você estiver **segurando a Bola** e o selvagem estiver com **pouca vida**, o parceiro **para de bater** para você capturar.
+- Se o parceiro desmaiar, ele volta em **20 segundos**. Fora de combate ele recupera vida sozinho.
+- Cada selvagem **derrotado** dá **XP** para o parceiro (selvagens mais raros e de nível mais alto dão mais).
+  Capturar um brainrot com o parceiro do lado também dá metade do XP.
+- **Cada nível:** +8% de vida, +8% de força e +10% de renda no pedestal. Nível máximo: 50.
+- **Evolução:** no **nível 15** e no **nível 30** ele evolui: muda de nome, fica maior, ganha aura (e coroa na
+  evolução final), muito mais vida/força e rende **1,5x** e depois **2,5x** mais na base.
+
+| Nível | Ataque novo | Tecla |
+|---|---|---|
+| 1 | Ataque (automático) | — |
+| 5 | Cabeçada (corpo a corpo forte) | Z |
+| 10 | Rajada Brainrot (de longe) | X |
+| 20 | Terremoto (acerta todos em volta) | C |
+| 30 | **Golpe especial** de cada brainrot (ex.: *Ligação Explosiva*, *Miado Cósmico*) | V |
+
+Mire com o mouse no brainrot e aperte a tecla (ou toque no botão do ataque na tela).
+
+> Os selvagens também têm **nível** (Comum Lv.1–5 até Mítico Lv.15–20). Quando você captura, o brainrot vem
+> com o nível que tinha!
 
 ### Raridades
 
-| Raridade | Exemplos | Vida | Chance base | Renda |
-|---|---|---|---|---|
-| Comum | Bananito Telefonino, Sapo Tamburello, Pizzaroni Turbonelli | 50–70 | 40–50% | $1–3/s |
-| Raro | Tostadino Volante, Mucca Skateboardina, Melancino Patinetto | 120–140 | 25–28% | $8–10/s |
-| Épico | Pinguino Spaghettino, Girafino Lampadino | 250–280 | 12–14% | $25–30/s |
-| Lendário | Polpo Saxofono, Dinossauro Croissantino | 500–550 | 6–7% | $80–90/s |
-| Mítico | Gattino Cosmonauta | 1000 | 3% | $250/s |
+Vida e renda abaixo são no **nível 1** (aumentam com o nível).
+
+| Raridade | Exemplos | Vida | Chance base | Renda | Nível selvagem |
+|---|---|---|---|---|---|
+| Comum | Bananito Telefonino, Sapo Tamburello, Pizzaroni Turbonelli | 50–70 | 40–50% | $1–3/s | 1–5 |
+| Raro | Tostadino Volante, Mucca Skateboardina, Melancino Patinetto | 120–140 | 25–28% | $8–10/s | 3–8 |
+| Épico | Pinguino Spaghettino, Girafino Lampadino | 250–280 | 12–14% | $25–30/s | 6–12 |
+| Lendário | Polpo Saxofono, Dinossauro Croissantino | 500–550 | 6–7% | $80–90/s | 10–16 |
+| Mítico | Gattino Cosmonauta | 1000 | 3% | $250/s | 15–20 |
 
 ### Bolas
 
@@ -71,7 +100,8 @@ Crie os objetos abaixo no Studio (o nome precisa ser **exatamente** igual) e col
 ReplicatedStorage
 └── Shared                (Folder)
     ├── Config            (ModuleScript)  ← src/shared/Config.luau
-    └── CatchMath         (ModuleScript)  ← src/shared/CatchMath.luau
+    ├── CatchMath         (ModuleScript)  ← src/shared/CatchMath.luau
+    └── Stats             (ModuleScript)  ← src/shared/Stats.luau
 
 ServerScriptService
 └── Server                (Folder)
@@ -83,6 +113,7 @@ ServerScriptService
         ├── WorldBuilder  (ModuleScript)  ← src/server/Services/WorldBuilder.luau
         ├── WildService   (ModuleScript)  ← src/server/Services/WildService.luau
         ├── TycoonService (ModuleScript)  ← src/server/Services/TycoonService.luau
+        ├── CompanionService (ModuleScript) ← src/server/Services/CompanionService.luau
         ├── ToolService   (ModuleScript)  ← src/server/Services/ToolService.luau
         └── ShopService   (ModuleScript)  ← src/server/Services/ShopService.luau
 
@@ -111,6 +142,10 @@ Tudo fica em **`src/shared/Config.luau`**:
 - **Seu próprio mapa:** coloque `Config.BuildMap = false` e ajuste `Config.Wild.ZoneCenter` / `ZoneSize`
   para a área onde os brainrots devem andar.
 - **Balanceamento:** vida, chance, preços, renda, dano, tempo de regeneração, quantidade de brainrots no mapa.
+- **Níveis e evolução:** `Config.Levels` (XP necessário, bônus por nível, níveis de evolução).
+- **Ataques:** `Config.Moves` (dano, recarga, alcance, nível para aprender e tecla).
+- **Parceiro:** `Config.Companion` (força extra, tempo de desmaio, distância do modo automático).
+- **Nomes das evoluções e golpe especial:** campos `evolutions` e `signature` de cada brainrot.
 
 ## Estrutura do código
 
@@ -118,11 +153,13 @@ Tudo fica em **`src/shared/Config.luau`**:
 |---|---|
 | `shared/Config` | Todos os números e listas do jogo |
 | `shared/CatchMath` | Fórmula de captura (servidor e tela usam a mesma) |
+| `shared/Stats` | Vida/força/renda por nível, evoluções, XP e ataques aprendidos |
 | `server/Main` | Liga tudo e cuida de entrada/saída de jogadores |
 | `DataService` | Salva/carrega dados (DataStore) e o placar (leaderstats) |
 | `WorldBuilder` | Constrói o mapa |
 | `WildService` | Brainrots selvagens: spawn, IA, vida, ataque, regeneração, desmaio |
+| `CompanionService` | Parceiro: seguir, lutar, ataques especiais, desmaio, XP, nível e evolução |
 | `ToolService` | Taco (golpe) e Bola (arremesso em arco + tentativa de captura com sacudidas) |
 | `TycoonService` | Bases, pedestais, renda passiva e coletor |
 | `ShopService` | Loja, vender, colocar/guardar e escolher bola |
-| `client/Main` | Interface: dinheiro, bolas, inventário, loja, Brainrotdex e chance na mira |
+| `client/Main` | Interface: dinheiro, bolas, inventário, loja, Brainrotdex, chance na mira e painel do parceiro |

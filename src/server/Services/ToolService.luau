@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
 local WildService = require(script.Parent.WildService)
+local CompanionService = require(script.Parent.CompanionService)
 local Remotes = require(script.Parent.Remotes)
 
 local ToolService = {}
@@ -104,6 +105,7 @@ local function onSwing(player: Player, tool: Tool)
 	local target = WildService.findTargetInFront(player, batDef.range)
 	if target then
 		WildService.damage(target, batDef.damage, player)
+		CompanionService.setTarget(player, target) -- seu parceiro ataca o mesmo brainrot
 	end
 end
 
@@ -215,8 +217,9 @@ local function attemptCapture(player: Player, state, ball: BasePart, ballDef)
 		if WildService.isAlive(state) then
 			WildService.removeCaptured(state)
 		end
-		DataService.addBrainrot(player, def.id)
-		Remotes.CatchResult:FireClient(player, true, def.id, chance)
+		DataService.addBrainrot(player, def.id, state.level)
+		CompanionService.onCaptured(player, state)
+		Remotes.CatchResult:FireClient(player, true, def.id, chance, state.level)
 	else
 		WildService.poof(base.Position, rarity.color)
 		ball:Destroy()

@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CatchMath = require(ReplicatedStorage.Shared.CatchMath)
+local Stats = require(ReplicatedStorage.Shared.Stats)
 local DataService = require(script.Parent.DataService)
 local BrainrotModels = require(script.Parent.BrainrotModels)
 local Remotes = require(script.Parent.Remotes)
@@ -236,17 +237,19 @@ local function refreshSlot(plot, slot)
 	if item then
 		local def = Config.getBrainrot(item.id)
 		local rarity = Config.getRarity(def.rarity)
+		local level = item.level or 1
+		local name = Stats.displayName(def, level)
 		slot.part.Color = rarity.color
 
-		local model = BrainrotModels.build(def, 0.9)
+		local model = BrainrotModels.build(def, 0.9 * Stats.scale(level), Stats.stage(level))
 		local hip = model:GetAttribute("HipHeight") or def.size.Y / 2
 		model:PivotTo(slot.topCF * CFrame.new(0, hip, 0))
 		model.Parent = plot.model
 		slot.display = model
 
-		slot.label.Text = def.name .. "\n<font color=\"#7CFF7C\">+$" .. fmt(def.income) .. "/s</font>"
+		slot.label.Text = name .. " Lv." .. level .. "\n<font color=\"#7CFF7C\">+$" .. fmt(Stats.income(def, level)) .. "/s</font>"
 		prompt.ActionText = "Guardar"
-		prompt.ObjectText = def.name
+		prompt.ObjectText = name
 		prompt.Enabled = true
 	else
 		slot.part.Color = Color3.fromRGB(180, 180, 190)
@@ -255,7 +258,7 @@ local function refreshSlot(plot, slot)
 		prompt.ObjectText = "Pedestal " .. slot.index
 		prompt.Enabled = true
 	end
-	slot.label.Parent.StudsOffsetWorldSpace = Vector3.new(0, if item then 8 else 3, 0)
+	slot.label.Parent.StudsOffsetWorldSpace = Vector3.new(0, if item then 8 * Stats.scale(item.level or 1) else 3, 0)
 end
 
 local function refreshPlot(plot)
@@ -279,7 +282,7 @@ local function getIncome(player: Player): number
 		if item.slot then
 			local def = Config.getBrainrot(item.id)
 			if def then
-				total += def.income
+				total += Stats.income(def, item.level or 1)
 			end
 		end
 	end
@@ -361,13 +364,17 @@ function TycoonService.place(player: Player, uid: string?, slotIndex: number?)
 		if item.slot then
 			return false, "Esse brainrot já está em um pedestal."
 		end
+		if item.uid == data.companion then
+			return false, "Esse é o seu parceiro de batalha! Guarde ele antes."
+		end
 	else
-		-- escolhe o que dá mais dinheiro
+		-- escolhe o que dá mais dinheiro (menos o parceiro)
 		local bestIncome = -1
 		for _, candidate in ipairs(data.inventory) do
 			local def = Config.getBrainrot(candidate.id)
-			if not candidate.slot and def and def.income > bestIncome then
-				item, bestIncome = candidate, def.income
+			local income = def and Stats.income(def, candidate.level or 1)
+			if not candidate.slot and candidate.uid ~= data.companion and def and income > bestIncome then
+				item, bestIncome = candidate, income
 			end
 		end
 		if not item then
@@ -393,7 +400,7 @@ function TycoonService.place(player: Player, uid: string?, slotIndex: number?)
 	refreshSlot(plot, plot.slots[slotIndex])
 	updateCollectorLabel(plot)
 	DataService.pushUpdate(player)
-	return true, Config.getBrainrot(item.id).name .. " colocado no pedestal " .. slotIndex .. "!"
+	return true, Stats.displayName(Config.getBrainrot(item.id), item.level or 1) .. " colocado no pedestal " .. slotIndex .. "!"
 end
 
 function TycoonService.store(player: Player, uid: string)
@@ -409,7 +416,7 @@ function TycoonService.store(player: Player, uid: string)
 		updateCollectorLabel(plot)
 	end
 	DataService.pushUpdate(player)
-	return true, Config.getBrainrot(item.id).name .. " guardado."
+	return true, Stats.displayName(Config.getBrainrot(item.id), item.level or 1) .. " guardado."
 end
 
 -- Chamado quando um brainrot é vendido (pode estar em um pedestal)

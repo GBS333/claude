@@ -36,7 +36,8 @@ local function defaultData()
 		balls = deepCopy(Config.StartingBalls),
 		bat = "Madeira",
 		ownedBats = { Madeira = true },
-		inventory = {}, -- lista de { uid = "1", id = "Sapo", slot = nil ou número do pedestal }
+		inventory = {}, -- lista de { uid = "1", id = "Sapo", level = 1, xp = 0, slot = nil ou número do pedestal }
+		-- companion = uid do brainrot parceiro (ou nil)
 		unlockedSlots = Config.Tycoon.StartingSlots,
 		dex = {}, -- [id] = quantas vezes capturou
 		nextUid = 1,
@@ -107,11 +108,23 @@ function DataService.load(player: Player)
 		reconcile(data, defaultData())
 	end
 
-	-- remove brainrots que não existem mais na Config
+	-- remove brainrots que não existem mais na Config e completa nível/XP de saves antigos
+	local companionFound = false
 	for i = #data.inventory, 1, -1 do
-		if not Config.getBrainrot(data.inventory[i].id) then
+		local item = data.inventory[i]
+		if not Config.getBrainrot(item.id) then
 			table.remove(data.inventory, i)
+		else
+			item.level = math.clamp(math.floor(tonumber(item.level) or 1), 1, Config.Levels.MaxLevel)
+			item.xp = tonumber(item.xp) or 0
+			if item.uid == data.companion then
+				companionFound = true
+				item.slot = nil
+			end
 		end
+	end
+	if not companionFound then
+		data.companion = nil
 	end
 
 	-- se falhou o carregamento, não salva por cima (para não apagar o progresso)
@@ -166,6 +179,8 @@ function DataService.snapshot(player: Player)
 		unlockedSlots = data.unlockedSlots,
 		dex = data.dex,
 		totalCaught = data.totalCaught,
+		companion = data.companion,
+		autoBattle = player:GetAttribute("AutoBattle") ~= false,
 		selectedBall = player:GetAttribute("SelectedBall") or "Basica",
 	}
 end
@@ -230,12 +245,12 @@ end
 ---------------------------------------------------------------------
 -- Brainrots
 ---------------------------------------------------------------------
-function DataService.addBrainrot(player: Player, brainrotId: string)
+function DataService.addBrainrot(player: Player, brainrotId: string, level: number?)
 	local data = profiles[player]
 	if not data then
 		return nil
 	end
-	local item = { uid = tostring(data.nextUid), id = brainrotId }
+	local item = { uid = tostring(data.nextUid), id = brainrotId, level = level or 1, xp = 0 }
 	data.nextUid += 1
 	table.insert(data.inventory, item)
 	data.dex[brainrotId] = (data.dex[brainrotId] or 0) + 1
@@ -264,6 +279,9 @@ function DataService.removeBrainrot(player: Player, uid: string)
 		return nil
 	end
 	table.remove(data.inventory, i)
+	if data.companion == uid then
+		data.companion = nil
+	end
 	DataService.pushUpdate(player)
 	return item
 end

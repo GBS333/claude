@@ -162,9 +162,67 @@ local function buildFromParts(def, scale: number)
 	return model
 end
 
--- Cria um novo modelo do brainrot. scale = tamanho (1 = normal).
-function BrainrotModels.build(def, scale: number?)
-	scale = scale or 1
+-- Efeitos das evoluções: 2ª evolução brilha, 3ª ganha coroa e aura
+local function applyStage(model: Model, def, stage: number)
+	if stage < 2 or not model.PrimaryPart then
+		return
+	end
+	local root = model.PrimaryPart
+	local color = Config.getRarity(def.rarity).color
+
+	local aura = Instance.new("ParticleEmitter")
+	aura.Name = "EvoAura"
+	aura.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	aura.LightEmission = 0.8
+	aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	aura.Transparency = NumberSequence.new(0.3)
+	aura.Lifetime = NumberRange.new(0.8, 1.4)
+	aura.Rate = if stage >= 3 then 25 else 10
+	aura.Speed = NumberRange.new(1, 3)
+	aura.SpreadAngle = Vector2.new(180, 180)
+	aura.Parent = root
+
+	if stage >= 3 then
+		local _, size = model:GetBoundingBox()
+		local crown = Instance.new("Part")
+		crown.Name = "EvoCrown"
+		crown.Anchored = true
+		crown.CanCollide = false
+		crown.CanTouch = false
+		crown.Material = Enum.Material.Neon
+		crown.Color = Color3.fromRGB(255, 215, 50)
+		crown.Size = Vector3.new(size.X * 0.45, 0.5, size.X * 0.45)
+		crown.CFrame = root.CFrame * CFrame.new(0, size.Y / 2 + 0.6, 0)
+		crown.Parent = model
+		for i = 0, 3 do
+			local spike = Instance.new("Part")
+			spike.Name = "EvoSpike"
+			spike.Anchored = true
+			spike.CanCollide = false
+			spike.CanTouch = false
+			spike.Material = Enum.Material.Neon
+			spike.Color = crown.Color
+			spike.Size = Vector3.new(0.35, 0.8, 0.35)
+			local angle = i * math.pi / 2
+			spike.CFrame = crown.CFrame * CFrame.new(math.cos(angle) * size.X * 0.18, 0.6, math.sin(angle) * size.X * 0.18)
+			spike.Parent = model
+		end
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 14
+		light.Brightness = 3
+		light.Parent = root
+	end
+end
+
+-- Cria um novo modelo do brainrot. scale = tamanho (1 = normal). stage = evolução (1, 2 ou 3).
+function BrainrotModels.build(def, scale: number?, stage: number?)
+	local model = BrainrotModels.buildBase(def, scale or 1)
+	applyStage(model, def, stage or 1)
+	return model
+end
+
+function BrainrotModels.buildBase(def, scale: number)
 	local folder = ServerStorage:FindFirstChild("BrainrotModels")
 	local custom = folder and folder:FindFirstChild(def.id)
 	if custom and custom:IsA("Model") and custom.PrimaryPart then

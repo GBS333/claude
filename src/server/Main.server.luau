@@ -10,12 +10,14 @@ local WorldBuilder = require(Services.WorldBuilder)
 local TycoonService = require(Services.TycoonService)
 local WildService = require(Services.WildService)
 local ToolService = require(Services.ToolService)
+local CompanionService = require(Services.CompanionService)
 local ShopService = require(Services.ShopService)
 
 WorldBuilder.build()
 TycoonService.start()
 WildService.start()
 ToolService.start()
+CompanionService.start()
 ShopService.start()
 
 local function onCharacter(player: Player, character: Model)
@@ -28,6 +30,8 @@ local function onCharacter(player: Player, character: Model)
 	end
 	ToolService.giveTools(player)
 	TycoonService.teleportHome(player)
+	task.wait(0.1)
+	CompanionService.spawn(player) -- seu parceiro aparece do seu lado
 end
 
 local function onPlayerAdded(player: Player)
@@ -47,6 +51,11 @@ local function onPlayerAdded(player: Player)
 	end
 
 	Remotes.notify(player, "Bem-vindo! Pegue o 🏏 Taco, bata nos brainrots e use a ⚪ Bola quando estiverem com POUCA vida!", Color3.fromRGB(255, 230, 100))
+	task.delay(6, function()
+		if player.Parent == Players then
+			Remotes.notify(player, "⚔ Escolha um brainrot como PARCEIRO no menu 🎒 para ele lutar com você e ganhar XP!", Color3.fromRGB(140, 230, 255))
+		end
+	end)
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
@@ -55,6 +64,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	CompanionService.dismiss(player, true)
 	TycoonService.release(player)
 	DataService.release(player)
 end)

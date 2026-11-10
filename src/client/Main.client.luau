@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -11,12 +12,14 @@ local mouse = player:GetMouse()
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local CatchMath = require(Shared:WaitForChild("CatchMath"))
+local Stats = require(Shared:WaitForChild("Stats"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ThrowBall = Remotes:WaitForChild("ThrowBall")
 local DataUpdated = Remotes:WaitForChild("DataUpdated")
 local Notify = Remotes:WaitForChild("Notify")
 local CatchResult = Remotes:WaitForChild("CatchResult")
+local CompanionEvent = Remotes:WaitForChild("CompanionEvent")
 local Action = Remotes:WaitForChild("Action")
 
 local fmt = CatchMath.formatNumber
@@ -170,7 +173,7 @@ local incomeLabel = label({
 ---------------------------------------------------------------------
 local hint = label({
 	AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -175), Size = UDim2.new(0.7, 0, 0, 26),
-	Text = "🏏 Bata nos brainrots com o Taco  •  ⚪ Jogue a Bola quando estiverem com POUCA vida  •  🏠 Coloque eles na sua base para ganhar $",
+	Text = "🏏 Bata com o Taco  •  ⚪ Bola quando estiverem com POUCA vida  •  ⚔ Escolha um PARCEIRO no 🎒 para lutar e evoluir  •  🏠 Pedestais dão $",
 	TextColor3 = Color3.fromRGB(255, 240, 160), TextStrokeTransparency = 0.3, Parent = gui,
 })
 new("UISizeConstraint", { MaxSize = Vector2.new(900, 26), Parent = hint })
@@ -333,25 +336,56 @@ renderers.Inventory = function()
 	end
 
 	local items = table.clone(data.inventory)
-	table.sort(items, function(a, b)
-		local da, db = Config.getBrainrot(a.id), Config.getBrainrot(b.id)
-		if (a.slot ~= nil) ~= (b.slot ~= nil) then
-			return a.slot ~= nil
+	local function sortKey(item)
+		if item.uid == data.companion then
+			return 2
+		elseif item.slot then
+			return 1
 		end
-		return da.income > db.income
+		return 0
+	end
+	table.sort(items, function(a, b)
+		local ka, kb = sortKey(a), sortKey(b)
+		if ka ~= kb then
+			return ka > kb
+		end
+		local da, db = Config.getBrainrot(a.id), Config.getBrainrot(b.id)
+		return Stats.income(da, a.level or 1) > Stats.income(db, b.level or 1)
 	end)
 
 	for i, item in ipairs(items) do
 		local def = Config.getBrainrot(item.id)
 		if def then
+			local level = item.level or 1
 			local rarity = Config.getRarity(def.rarity)
+			local isCompanion = item.uid == data.companion
 			local r = row(i, 60)
+			if isCompanion then
+				stroke(r, Color3.fromRGB(120, 220, 255), 2)
+			end
 			new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = rarity.color, BorderSizePixel = 0, Parent = r })
-			local where = if item.slot then "No pedestal " .. item.slot else "Guardado"
-			rowText(r, def.name, rarity.color, rarity.display .. " • +$" .. fmt(def.income) .. "/s • " .. where, 200)
+			local where = if isCompanion then "⚔ Parceiro" elseif item.slot then "Pedestal " .. item.slot else "Guardado"
+			local xpText = if level >= Config.Levels.MaxLevel then "MÁX"
+				else "XP " .. math.floor(item.xp or 0) .. "/" .. Stats.xpToNext(level)
+			rowText(r, Stats.displayName(def, level) .. "  Lv." .. level, rarity.color,
+				rarity.display .. " • +$" .. fmt(Stats.income(def, level)) .. "/s • " .. xpText .. " • " .. where, 270)
+
+			local companionButton = button({
+				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -180, 0.5, 0), Size = UDim2.fromOffset(80, 40),
+				Text = if isCompanion then "Recolher" else "⚔ Lutar",
+				BackgroundColor3 = if isCompanion then Color3.fromRGB(120, 120, 140) else Color3.fromRGB(200, 70, 90),
+				Parent = r,
+			})
+			companionButton.Activated:Connect(function()
+				if isCompanion then
+					act("Dismiss")
+				else
+					act("Summon", item.uid)
+				end
+			end)
 
 			local placeButton = button({
-				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -108, 0.5, 0), Size = UDim2.fromOffset(92, 40),
+				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -94, 0.5, 0), Size = UDim2.fromOffset(80, 40),
 				Text = if item.slot then "Guardar" else "Colocar",
 				BackgroundColor3 = if item.slot then Color3.fromRGB(120, 120, 140) else Color3.fromRGB(70, 140, 255),
 				Parent = r,
@@ -360,9 +394,10 @@ renderers.Inventory = function()
 				act(if item.slot then "Store" else "Place", item.uid)
 			end)
 
+			local price = Stats.sellPrice(def, level)
 			local sellButton = button({
-				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(92, 40),
-				Text = "Vender $" .. fmt(def.sellPrice), BackgroundColor3 = Color3.fromRGB(230, 150, 40), Parent = r,
+				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(80, 40),
+				Text = "Vender $" .. fmt(price), BackgroundColor3 = Color3.fromRGB(230, 150, 40), Parent = r,
 			})
 			local confirming = false
 			sellButton.Activated:Connect(function()
@@ -373,7 +408,7 @@ renderers.Inventory = function()
 					task.delay(2.5, function()
 						if sellButton.Parent then
 							confirming = false
-							sellButton.Text = "Vender $" .. fmt(def.sellPrice)
+							sellButton.Text = "Vender $" .. fmt(price)
 							sellButton.BackgroundColor3 = Color3.fromRGB(230, 150, 40)
 						end
 					end)
@@ -463,9 +498,9 @@ renderers.Dex = function()
 		new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = rarity.color, BorderSizePixel = 0, Parent = r })
 		local times = data.dex[def.id]
 		if times then
+			local evoText = if def.evolutions then " • Evolui: " .. table.concat(def.evolutions, " → ") else ""
 			rowText(r, def.name .. "  (x" .. times .. ")", rarity.color,
-				rarity.display .. " • Vida " .. def.maxHealth .. " • Captura " .. math.floor(def.catchRate * 100)
-					.. "% • +$" .. fmt(def.income) .. "/s", 0)
+				rarity.display .. " • Captura " .. math.floor(def.catchRate * 100) .. "%" .. evoText, 0)
 		else
 			rowText(r, "???", Color3.fromRGB(150, 150, 160), rarity.display .. " • Ainda não capturado", 0)
 		end
@@ -503,7 +538,7 @@ local function applyData(newData)
 	for _, item in ipairs(data.inventory) do
 		local def = Config.getBrainrot(item.id)
 		if item.slot and def then
-			income += def.income
+			income += Stats.income(def, item.level or 1)
 		end
 	end
 	incomeLabel.Text = "Renda: +$" .. fmt(income) .. "/s"
@@ -541,32 +576,58 @@ local bigText = label({
 new("UISizeConstraint", { MaxSize = Vector2.new(700, 90), Parent = bigText })
 local bigToken = 0
 
-CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance)
+local function showBig(text: string, color: Color3, duration: number?)
+	bigToken += 1
+	local token = bigToken
+	bigText.Visible = true
+	bigText.Text = text
+	bigText.TextColor3 = color
+	bigText.TextTransparency = 0
+	bigText.TextStrokeTransparency = 0
+	bigText.Size = UDim2.new(0.6, 0, 0, 60)
+	TweenService:Create(bigText, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Size = UDim2.new(0.8, 0, 0, 90) }):Play()
+	task.delay(duration or 2.5, function()
+		if token == bigToken then
+			TweenService:Create(bigText, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		end
+	end)
+end
+
+CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance, level)
 	local def = Config.getBrainrot(brainrotId)
 	if not def then
 		return
 	end
 	local rarity = Config.getRarity(def.rarity)
-	bigToken += 1
-	local token = bigToken
-	bigText.Visible = true
-	bigText.TextTransparency = 0
-	bigText.TextStrokeTransparency = 0
 	if success then
-		bigText.Text = "✨ CAPTUROU! ✨\n" .. def.name .. " (" .. rarity.display .. ")"
-		bigText.TextColor3 = rarity.color
-		toast("Vá até sua base 🏠 e coloque ele em um pedestal!", GREEN)
+		showBig("✨ CAPTUROU! ✨\n" .. def.name .. " Lv." .. (level or 1) .. " (" .. rarity.display .. ")", rarity.color)
+		toast("Coloque ele em um pedestal 🏠 ou escolha como parceiro ⚔ no menu 🎒", GREEN)
 	else
-		bigText.Text = "💨 Escapou! 💨\nChance era " .. math.floor(chance * 100) .. "% — bata mais nele!"
-		bigText.TextColor3 = RED
+		showBig("💨 Escapou! 💨\nChance era " .. math.floor(chance * 100) .. "% — bata mais nele!", RED)
 	end
-	bigText.Size = UDim2.new(0.6, 0, 0, 60)
-	TweenService:Create(bigText, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Size = UDim2.new(0.8, 0, 0, 90) }):Play()
-	task.delay(2.5, function()
-		if token == bigToken then
-			TweenService:Create(bigText, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+end)
+
+local EVO_COLOR = Color3.fromRGB(255, 220, 80)
+local pendingEvolution = false
+CompanionEvent.OnClientEvent:Connect(function(kind, a, b)
+	if kind == "evolve" then
+		pendingEvolution = true
+		showBig("🌟 EVOLUIU! 🌟\n" .. a .. " → " .. b, EVO_COLOR, 4)
+		task.delay(4, function()
+			pendingEvolution = false
+		end)
+	elseif kind == "levelup" then
+		if not pendingEvolution then
+			showBig("⬆ SUBIU DE NÍVEL! ⬆\n" .. a .. " agora é Lv." .. b, Color3.fromRGB(120, 230, 255))
 		end
-	end)
+		toast("⬆ " .. a .. " Lv." .. b .. ": mais vida, força e renda!", Color3.fromRGB(120, 230, 255))
+	elseif kind == "learn" then
+		toast("📘 Aprendeu um ataque novo: " .. a .. (if b then " (tecla " .. b .. ")" else ""), EVO_COLOR)
+	elseif kind == "faint" then
+		toast("😵 " .. a .. " desmaiou! Volta em " .. b .. "s.", RED)
+	elseif kind == "revive" then
+		toast("💪 " .. a .. " voltou para a luta!", GREEN)
+	end
 end)
 
 ---------------------------------------------------------------------
@@ -594,8 +655,11 @@ local function getHoveredBrainrot()
 	return target
 end
 
+local hoveredWildRef = { model = nil }
+
 RunService.RenderStepped:Connect(function()
 	local model = getHoveredBrainrot()
+	hoveredWildRef.model = model
 	local id = model and model:GetAttribute("BrainrotId")
 	local def = id and Config.getBrainrot(id)
 	if not def or (model:GetAttribute("Health") or 0) <= 0 then
@@ -608,13 +672,195 @@ RunService.RenderStepped:Connect(function()
 	local chance = CatchMath.getChance(def.catchRate, health, maxHealth, ballDef.multiplier)
 
 	local rarity = Config.getRarity(def.rarity)
-	targetName.Text = def.name
+	targetName.Text = def.name .. "  Lv." .. (model:GetAttribute("Level") or 1)
 	targetName.TextColor3 = rarity.color
 	targetStroke.Color = rarity.color
 	targetChance.Text = "❤ " .. math.ceil(health) .. "/" .. maxHealth .. "   🎯 Chance: " .. math.floor(chance * 100) .. "%"
 	targetChance.TextColor3 = if chance >= 0.5 then GREEN elseif chance >= 0.2 then Color3.fromRGB(255, 210, 80) else RED
 	targetInfo.Position = UDim2.fromOffset(mouse.X + 18, mouse.Y + 18)
 	targetInfo.Visible = true
+end)
+
+
+---------------------------------------------------------------------
+-- PARCEIRO: vida, XP, ataques (Z X C V) e modo automático
+---------------------------------------------------------------------
+local companionsFolder = workspace:WaitForChild("Companions")
+
+local hudFrame = new("Frame", {
+	Position = UDim2.fromOffset(12, 92), Size = UDim2.fromOffset(268, 158),
+	BackgroundColor3 = DARK, BackgroundTransparency = 0.1, Parent = gui,
+})
+corner(hudFrame, 12)
+stroke(hudFrame, Color3.fromRGB(120, 220, 255), 2)
+
+local hudName = label({
+	Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 22), Font = Enum.Font.FredokaOne,
+	TextXAlignment = Enum.TextXAlignment.Left, Text = "⚔ Sem parceiro", Parent = hudFrame,
+})
+local hudEmpty = label({
+	Position = UDim2.fromOffset(10, 32), Size = UDim2.new(1, -20, 0, 36), TextWrapped = true,
+	Text = "Abra 🎒 Brainrots e aperte ⚔ Lutar em um brainrot.", TextColor3 = Color3.fromRGB(200, 200, 210),
+	Font = Enum.Font.Gotham, Parent = hudFrame,
+})
+
+local function bar(y: number, height: number, color: Color3)
+	local back = new("Frame", {
+		Position = UDim2.fromOffset(10, y), Size = UDim2.new(1, -20, 0, height),
+		BackgroundColor3 = Color3.fromRGB(50, 50, 60), BorderSizePixel = 0, Parent = hudFrame,
+	})
+	corner(back, 6)
+	local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0, Parent = back })
+	corner(fill, 6)
+	local text = label({ Size = UDim2.fromScale(1, 1), ZIndex = 2, TextStrokeTransparency = 0.3, Parent = back })
+	return back, fill, text
+end
+local hpBack, hpFill, hpText = bar(32, 16, Color3.fromRGB(80, 220, 100))
+local xpBack, xpFill, xpText = bar(52, 12, Color3.fromRGB(110, 200, 255))
+
+local moveRow = new("Frame", {
+	Position = UDim2.fromOffset(10, 70), Size = UDim2.new(1, -20, 0, 50), BackgroundTransparency = 1, Parent = hudFrame,
+})
+new("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder,
+	Parent = moveRow,
+})
+
+local cooldownEnds = {}
+local moveButtons = {}
+
+local function useMove(move)
+	if not data or not data.companion then
+		toast("Escolha um parceiro no menu 🎒 primeiro!", RED)
+		return
+	end
+	if cooldownEnds[move.id] and os.clock() < cooldownEnds[move.id] then
+		return
+	end
+	local ok = act("UseMove", move.id, hoveredWildRef.model)
+	if ok then
+		cooldownEnds[move.id] = os.clock() + move.cooldown
+	end
+end
+
+local specialMoves = {}
+for _, move in ipairs(Config.Moves) do
+	if not move.auto then
+		table.insert(specialMoves, move)
+	end
+end
+
+for i, move in ipairs(specialMoves) do
+	local b = button({
+		Size = UDim2.fromOffset(55, 50), LayoutOrder = i, Text = "", BackgroundColor3 = Color3.fromRGB(200, 70, 90),
+		Parent = moveRow,
+	})
+	local key = label({
+		Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 16), Text = move.key or "",
+		TextColor3 = Color3.fromRGB(255, 240, 160), Font = Enum.Font.FredokaOne, Parent = b,
+	})
+	local name = label({
+		Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 1, -16), Text = move.name, TextWrapped = true,
+		Font = Enum.Font.GothamBold, Parent = b,
+	})
+	local shade = new("Frame", {
+		AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.fromScale(1, 0),
+		BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, BorderSizePixel = 0, ZIndex = 3, Parent = b,
+	})
+	corner(shade, 8)
+	moveButtons[move.id] = { button = b, key = key, name = name, shade = shade, move = move }
+	b.Activated:Connect(function()
+		useMove(move)
+	end)
+end
+
+local autoButton = button({
+	Position = UDim2.fromOffset(10, 126), Size = UDim2.new(1, -20, 0, 26), Text = "⚔ Auto: LIGADO",
+	BackgroundColor3 = Color3.fromRGB(60, 170, 90), Parent = hudFrame,
+})
+autoButton.Activated:Connect(function()
+	act("ToggleAuto")
+end)
+
+local keyToMove = {}
+for _, move in ipairs(specialMoves) do
+	if move.key then
+		keyToMove[Enum.KeyCode[move.key]] = move
+	end
+end
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+	local move = keyToMove[input.KeyCode]
+	if move then
+		useMove(move)
+	end
+end)
+
+local function findMyCompanion()
+	for _, model in ipairs(companionsFolder:GetChildren()) do
+		if model:GetAttribute("OwnerUserId") == player.UserId then
+			return model
+		end
+	end
+	return nil
+end
+
+RunService.RenderStepped:Connect(function()
+	local item
+	if data and data.companion then
+		for _, it in ipairs(data.inventory) do
+			if it.uid == data.companion then
+				item = it
+				break
+			end
+		end
+	end
+	local def = item and Config.getBrainrot(item.id)
+
+	autoButton.Text = if data and data.autoBattle == false then "⚔ Auto: DESLIGADO" else "⚔ Auto: LIGADO"
+	autoButton.BackgroundColor3 = if data and data.autoBattle == false then Color3.fromRGB(120, 120, 140)
+		else Color3.fromRGB(60, 170, 90)
+
+	if not def then
+		hudName.Text = "⚔ Sem parceiro"
+		hudName.TextColor3 = Color3.new(1, 1, 1)
+		hudEmpty.Visible = true
+		hpBack.Visible, xpBack.Visible, moveRow.Visible = false, false, false
+		return
+	end
+	hudEmpty.Visible = false
+	hpBack.Visible, xpBack.Visible, moveRow.Visible = true, true, true
+
+	local level = item.level or 1
+	hudName.Text = "⚔ " .. Stats.displayName(def, level) .. "  Lv." .. level
+	hudName.TextColor3 = Config.getRarity(def.rarity).color
+
+	local model = findMyCompanion()
+	local maxHealth = (model and model:GetAttribute("MaxHealth")) or Stats.companionMaxHealth(def, level)
+	local health = (model and model:GetAttribute("Health")) or maxHealth
+	hpFill.Size = UDim2.fromScale(math.clamp(health / maxHealth, 0, 1), 1)
+	hpText.Text = if health <= 0 then "😵 Desmaiado" else "❤ " .. math.ceil(health) .. " / " .. maxHealth
+
+	if level >= Config.Levels.MaxLevel then
+		xpFill.Size = UDim2.fromScale(1, 1)
+		xpText.Text = "NÍVEL MÁXIMO"
+	else
+		local need = Stats.xpToNext(level)
+		xpFill.Size = UDim2.fromScale(math.clamp((item.xp or 0) / need, 0, 1), 1)
+		xpText.Text = "XP " .. math.floor(item.xp or 0) .. " / " .. need
+	end
+
+	local now = os.clock()
+	for _, entry in pairs(moveButtons) do
+		local move = entry.move
+		local locked = level < move.level
+		entry.name.Text = if locked then "Lv." .. move.level else Stats.moveName(move, def)
+		entry.button.BackgroundColor3 = if locked then Color3.fromRGB(70, 70, 80) else Color3.fromRGB(200, 70, 90)
+		local remaining = (cooldownEnds[move.id] or 0) - now
+		entry.shade.Size = UDim2.fromScale(1, if remaining > 0 then math.clamp(remaining / move.cooldown, 0, 1) else 0)
+	end
 end)
 
 ---------------------------------------------------------------------
