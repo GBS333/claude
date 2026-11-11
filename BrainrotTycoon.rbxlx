@@ -1611,13 +1611,42 @@ end
 ---------------------------------------------------------------------
 local templates = {} -- modelo pronto de cada brainrot (montado uma vez, depois só clonado)
 
+-- "Lirilì Larilà" -> "lirililarila" (sem maiúsculas, espaços, acentos e símbolos)
+local ACCENTS = {
+	["á"] = "a", ["à"] = "a", ["â"] = "a", ["ã"] = "a", ["ä"] = "a", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
+	["í"] = "i", ["ì"] = "i", ["î"] = "i", ["ï"] = "i", ["ó"] = "o", ["ò"] = "o", ["ô"] = "o", ["õ"] = "o", ["ö"] = "o",
+	["ú"] = "u", ["ù"] = "u", ["û"] = "u", ["ü"] = "u", ["ç"] = "c", ["ñ"] = "n",
+}
+local function normalize(text: string): string
+	text = string.lower(text)
+	for accented, plain in pairs(ACCENTS) do
+		text = string.gsub(text, accented, plain)
+	end
+	return (string.gsub(text, "[^%w]", ""))
+end
+
+-- acha o modelo pelo id ("Tralalero") ou pelo nome completo ("Tralalero Tralala")
+local function findCustomModel(folder: Instance, def)
+	local exact = folder:FindFirstChild(def.id)
+	if exact and exact:IsA("Model") then
+		return exact
+	end
+	local wanted = { [normalize(def.id)] = true, [normalize(def.name)] = true }
+	for _, child in ipairs(folder:GetChildren()) do
+		if child:IsA("Model") and wanted[normalize(child.Name)] then
+			return child
+		end
+	end
+	return nil
+end
+
 local function getTemplate(def)
 	local template = templates[def.id]
 	if template then
 		return template
 	end
 	local folder = ServerStorage:FindFirstChild("BrainrotModels")
-	local custom = folder and folder:FindFirstChild(def.id)
+	local custom = folder and findCustomModel(folder, def)
 	if custom and custom:IsA("Model") then
 		local ok, result = pcall(prepareCustom, def, custom)
 		if ok then
