@@ -18,6 +18,77 @@ local M = Enum.Material
 local terrain = workspace.Terrain
 local rng = Random.new(2025)
 
+local CARTOON = Config.MapStyle ~= "Realista"
+
+-- cores do estilo "Desenho" para cada material de terreno
+local CARTOON_COLORS = {
+	[M.Grass] = RGB(120, 205, 90),
+	[M.LeafyGrass] = RGB(95, 190, 80),
+	[M.Sand] = RGB(250, 222, 140),
+	[M.Mud] = RGB(125, 105, 75),
+	[M.Snow] = RGB(240, 248, 255),
+	[M.Basalt] = RGB(70, 62, 72),
+	[M.Rock] = RGB(160, 155, 165),
+	[M.Salt] = RGB(225, 235, 255),
+	[M.Cobblestone] = RGB(215, 205, 185),
+	[M.CrackedLava] = RGB(255, 120, 30),
+	[M.Water] = RGB(80, 180, 240),
+}
+
+local groundFolder -- peças do chão no estilo "Desenho"
+
+-- No estilo "Realista" usa o terreno do Roblox; no "Desenho" cria peças lisas.
+-- lift = sobe um pouquinho a peça para ela aparecer por cima das outras (sem piscar)
+local function fillBlock(cf: CFrame, size: Vector3, material, lift: number?)
+	if not CARTOON then
+		terrain:FillBlock(cf, size, material)
+		return
+	end
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = size
+	p.CFrame = cf + V(0, lift or 0, 0)
+	p.Color = CARTOON_COLORS[material] or RGB(200, 200, 200)
+	p.Material = if material == M.CrackedLava then M.Neon else M.SmoothPlastic
+	if material == M.Water then
+		p.Transparency = 0.15
+		p.CanCollide = false
+	end
+	p.Parent = groundFolder
+end
+
+local function fillBall(pos: Vector3, radius: number, material)
+	if not CARTOON then
+		terrain:FillBall(pos, radius, material)
+		return
+	end
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.Shape = Enum.PartType.Ball
+	p.Size = Vector3.one * radius * 2
+	p.CFrame = CFrame.new(pos)
+	p.Color = CARTOON_COLORS[material] or RGB(200, 200, 200)
+	p.Material = if material == M.CrackedLava then M.Neon else M.SmoothPlastic
+	p.Parent = groundFolder
+end
+
+-- Deixa tudo liso (sem texturas de madeira, tijolo, grama...) no estilo "Desenho"
+local KEEP_MATERIALS = {
+	[M.Neon] = true, [M.Glass] = true, [M.ForceField] = true, [M.SmoothPlastic] = true, [M.Metal] = true,
+}
+function WorldBuilder.applyStyle(root: Instance)
+	if not CARTOON then
+		return
+	end
+	for _, d in ipairs(root:GetDescendants()) do
+		if d:IsA("BasePart") and not KEEP_MATERIALS[d.Material] then
+			d.Material = M.SmoothPlastic
+		end
+	end
+end
+
 local ISLAND = 1120
 local BEACH = 40
 local HUB = V(-170, 0, 0)
@@ -88,7 +159,7 @@ local function path(x1, z1, x2, z2, width)
 	local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
 	local sx = math.abs(x2 - x1) + width
 	local sz = math.abs(z2 - z1) + width
-	terrain:FillBlock(CFrame.new(cx, -2, cz), V(sx, 4, sz), M.Cobblestone)
+	fillBlock(CFrame.new(cx, -2, cz), V(sx, 4, sz), M.Cobblestone, 0.1)
 	block(cx, cz, sx, sz)
 end
 
@@ -337,8 +408,8 @@ local function buildTerrain()
 
 	terrain:FillBlock(CFrame.new(0, -24, 0), V(1800, 4, 1800), M.Sand)
 	terrain:FillBlock(CFrame.new(0, -12, 0), V(1800, 20, 1800), M.Water)
-	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND + BEACH * 2, 16, ISLAND + BEACH * 2), M.Sand)
-	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND, 16, ISLAND), M.Grass)
+	fillBlock(CFrame.new(0, -8, 0), V(ISLAND + BEACH * 2, 16, ISLAND + BEACH * 2), M.Sand, -0.3)
+	fillBlock(CFrame.new(0, -8, 0), V(ISLAND, 16, ISLAND), M.Grass, 0)
 
 	local materials = {
 		Floresta = M.LeafyGrass, Deserto = M.Sand, Pantano = M.Mud, Neve = M.Snow, Vulcao = M.Basalt,
@@ -346,12 +417,12 @@ local function buildTerrain()
 	for _, biome in ipairs(Config.Biomes) do
 		local c = biome.center
 		if biome.id == "Ceu" then
-			terrain:FillBlock(CFrame.new(c.X, c.Y - 5, c.Z), V(biome.size.X, 10, biome.size.Y), M.Salt)
-			terrain:FillBall(c + V(0, -55, 0), 50, M.Rock)
-			terrain:FillBall(c + V(-50, -35, 30), 28, M.Rock)
-			terrain:FillBall(c + V(55, -38, -25), 30, M.Rock)
+			fillBlock(CFrame.new(c.X, c.Y - 5, c.Z), V(biome.size.X, 10, biome.size.Y), M.Salt, 0)
+			fillBall(c + V(0, -55, 0), 50, M.Rock)
+			fillBall(c + V(-50, -35, 30), 28, M.Rock)
+			fillBall(c + V(55, -38, -25), 30, M.Rock)
 		else
-			terrain:FillBlock(CFrame.new(c.X, -2, c.Z), V(biome.size.X, 4, biome.size.Y), materials[biome.id] or M.Grass)
+			fillBlock(CFrame.new(c.X, -2, c.Z), V(biome.size.X, 4, biome.size.Y), materials[biome.id] or M.Grass, 0.05)
 			block(c.X, c.Z, biome.size.X + 10, biome.size.Y + 10)
 		end
 	end
@@ -362,7 +433,7 @@ local function buildTerrain()
 		for _ = 1, 10 do
 			local p = biomePoint(swamp, 20)
 			if p then
-				terrain:FillBlock(CFrame.new(p.X, -1, p.Z), V(rng:NextInteger(3, 6) * 4, 2, rng:NextInteger(3, 5) * 4), M.Water)
+				fillBlock(CFrame.new(p.X, -1, p.Z), V(rng:NextInteger(3, 6) * 4, 2, rng:NextInteger(3, 5) * 4), M.Water, 0.12)
 			end
 		end
 	end
@@ -371,7 +442,7 @@ local function buildTerrain()
 		for _ = 1, 14 do
 			local p = biomePoint(volcano, 15)
 			if p then
-				terrain:FillBlock(CFrame.new(p.X, -2, p.Z), V(rng:NextInteger(2, 5) * 4, 4, rng:NextInteger(2, 5) * 4), M.CrackedLava)
+				fillBlock(CFrame.new(p.X, -2, p.Z), V(rng:NextInteger(2, 5) * 4, 4, rng:NextInteger(2, 5) * 4), M.CrackedLava, 0.12)
 			end
 		end
 	end
@@ -400,8 +471,8 @@ local function buildTerrain()
 
 	-- montanhas
 	local function mountain(pos: Vector3, radius: number, top)
-		terrain:FillBall(pos, radius, M.Rock)
-		terrain:FillBall(pos + V(0, -radius * 0.25, 0), radius * 0.95, top or M.Grass)
+		fillBall(pos, radius, if CARTOON then M.Grass else M.Rock)
+		fillBall(pos + V(0, -radius * 0.25, 0), radius * 0.95, top or M.Grass)
 		block(pos.X, pos.Z, radius * 2, radius * 2)
 	end
 	mountain(V(-480, -12, -480), 50)
@@ -409,13 +480,13 @@ local function buildTerrain()
 	mountain(V(-480, -12, 480), 50)
 	mountain(V(480, -12, 480), 50)
 	for _, x in ipairs({ -330, 330 }) do
-		terrain:FillBall(V(x, -10, -430), 58, M.Rock)
-		terrain:FillBall(V(x, 26, -430), 26, M.Snow)
+		fillBall(V(x, -10, -430), 58, M.Rock)
+		fillBall(V(x, 26, -430), 26, M.Snow)
 		block(x, -430, 116, 116)
 	end
 	for _, x in ipairs({ -330, 330 }) do
-		terrain:FillBall(V(x, -14, 430), 62, M.Basalt)
-		terrain:FillBall(V(x, 40, 430), 14, M.CrackedLava)
+		fillBall(V(x, -14, 430), 62, M.Basalt)
+		fillBall(V(x, 40, 430), 14, M.CrackedLava)
 		block(x, 430, 124, 124)
 	end
 end
@@ -642,9 +713,11 @@ local function setupLighting()
 		end
 		e.Parent = Lighting
 	end
-	effect("Atmosphere", { Density = 0.28, Offset = 0.2, Color = RGB(200, 225, 255), Decay = RGB(110, 145, 190), Glare = 0.2, Haze = 1 })
+	effect("Atmosphere", { Density = if CARTOON then 0.18 else 0.28, Offset = 0.2, Color = RGB(200, 225, 255),
+		Decay = RGB(110, 145, 190), Glare = 0.2, Haze = if CARTOON then 0.5 else 1 })
 	effect("BloomEffect", { Intensity = 0.4, Size = 24, Threshold = 1.6 })
-	effect("ColorCorrectionEffect", { Saturation = 0.18, Contrast = 0.06, Brightness = 0.02, TintColor = RGB(255, 255, 255) })
+	effect("ColorCorrectionEffect", { Saturation = if CARTOON then 0.3 else 0.18, Contrast = 0.06,
+		Brightness = if CARTOON then 0.04 else 0.02, TintColor = RGB(255, 255, 255) })
 	effect("SunRaysEffect", { Intensity = 0.06, Spread = 0.8 })
 end
 
@@ -665,6 +738,10 @@ function WorldBuilder.build()
 	if baseplate then
 		baseplate:Destroy()
 	end
+
+	groundFolder = Instance.new("Folder")
+	groundFolder.Name = "Chao"
+	groundFolder.Parent = map
 
 	buildTerrain()
 	setupLighting()
@@ -722,6 +799,8 @@ function WorldBuilder.build()
 	spawnLocation.Color = RGB(240, 240, 240)
 	spawnLocation.Neutral = true
 	spawnLocation.Duration = 3
+
+	WorldBuilder.applyStyle(map)
 end
 
 return WorldBuilder

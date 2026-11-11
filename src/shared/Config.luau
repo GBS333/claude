@@ -9,6 +9,9 @@ local RGB = Color3.fromRGB
 -- Se true, o servidor constrói o mapa sozinho (terreno, biomas, bases...).
 Config.BuildMap = true
 
+-- Estilo do mapa: "Desenho" (cores lisas e vivas, estilo cartoon) ou "Realista" (terreno com texturas)
+Config.MapStyle = "Desenho"
+
 Config.DataStoreName = "BrainrotTycoon_v1"
 Config.AutoSaveInterval = 120
 

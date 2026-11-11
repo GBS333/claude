@@ -23,6 +23,7 @@ local ShopService = require(Services.ShopService)
 
 WorldBuilder.build()
 TycoonService.start()
+WorldBuilder.applyStyle(workspace:WaitForChild("Plots")) -- bases no mesmo estilo do mapa
 WildService.start()
 EventService.start()
 ProgressService.start()
