@@ -490,7 +490,9 @@ function Companion:update(dt: number, now: number)
 	else
 		hop = math.abs(math.sin(now * 2 + self.phase)) * 0.15
 	end
-	self.model:PivotTo(CFrame.new(self.position + Vector3.new(0, self.hipHeight + hop, 0)) * CFrame.Angles(0, self.yaw, 0))
+	local sway = if moving then math.sin(self.phase) * 0.09 else 0 -- gingado
+	self.model:PivotTo(CFrame.new(self.position + Vector3.new(0, self.hipHeight + hop, 0)) * CFrame.Angles(0, self.yaw, 0)
+		* CFrame.Angles(0, 0, sway))
 
 	-- atacar
 	if target and not holdFire then

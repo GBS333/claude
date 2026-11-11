@@ -836,7 +836,10 @@ local function step(state, dt: number, now: number)
 	else
 		hop = math.abs(math.sin(now * 2 + state.phase)) * 0.15
 	end
+	-- gingado de um lado pro outro enquanto anda
+	local sway = if moving then math.sin(state.phase) * (if isBoss then 0.04 else 0.09) else 0
 	local cf = CFrame.new(state.position + Vector3.new(0, state.hipHeight + hop, 0)) * CFrame.Angles(0, state.yaw, 0)
+		* CFrame.Angles(0, 0, sway)
 	state.model:PivotTo(cf)
 end
 

@@ -1003,3 +1003,6 @@ require(script.Parent:WaitForChild("Social")).init({
 	end,
 	colors = { GREEN = GREEN, RED = RED, DARK = DARK, DARK2 = DARK2 },
 })
+
+-- animação de andar dos brainrots com articulações (modelos da Toolbox)
+require(script.Parent:WaitForChild("Animate")).start()

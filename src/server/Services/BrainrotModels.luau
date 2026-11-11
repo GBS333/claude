@@ -738,17 +738,20 @@ end
 local function prepareCustom(def, source: Model)
 	local model = source:Clone()
 	model.Name = def.id
+	local parts = {}
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BaseScript") or d:IsA("ModuleScript") or d:IsA("Sound") then
+		if d:IsA("LuaSourceContainer") or d:IsA("Sound") then
 			d:Destroy()
 		elseif d:IsA("Humanoid") then
 			d.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 			d.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 		elseif d:IsA("BasePart") then
-			d.Anchored = true
+			d.Anchored = true -- por enquanto (para medir e redimensionar)
 			d.CanCollide = false
 			d.CanTouch = false
 			d.CanQuery = false
+			d.Massless = true
+			table.insert(parts, d)
 		end
 	end
 
@@ -777,6 +780,62 @@ local function prepareCustom(def, source: Model)
 	root.CFrame = bbCF
 	root.Parent = model
 	model.PrimaryPart = root
+
+	-- Mantém as articulações (Motor6D) para a animação de andar funcionar:
+	-- cada grupo de peças ligadas entre si é soldado na Root, e só a Root fica ancorada.
+	local neighbors = {}
+	local hasMotors = false
+	local function link(a, b)
+		if a and b then
+			neighbors[a] = neighbors[a] or {}
+			neighbors[b] = neighbors[b] or {}
+			table.insert(neighbors[a], b)
+			table.insert(neighbors[b], a)
+		end
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("JointInstance") then
+			link(d.Part0, d.Part1)
+			if d:IsA("Motor6D") then
+				hasMotors = true
+			end
+		elseif d:IsA("WeldConstraint") then
+			link(d.Part0, d.Part1)
+		end
+	end
+	local visited = {}
+	for _, start in ipairs(parts) do
+		if not visited[start] then
+			local group, queue = {}, { start }
+			visited[start] = true
+			while #queue > 0 do
+				local current = table.remove(queue)
+				table.insert(group, current)
+				for _, other in ipairs(neighbors[current] or {}) do
+					if not visited[other] and other:IsDescendantOf(model) then
+						visited[other] = true
+						table.insert(queue, other)
+					end
+				end
+			end
+			local anchorPart = group[1]
+			for _, part in ipairs(group) do
+				if part.Name == "HumanoidRootPart" then
+					anchorPart = part
+					break
+				end
+			end
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = root
+			weld.Part1 = anchorPart
+			weld.Parent = root
+		end
+	end
+	for _, part in ipairs(parts) do
+		part.Anchored = false
+	end
+
+	model:SetAttribute("Rigged", hasMotors)
 	model:SetAttribute("HipHeight", bbSize.Y / 2)
 	return model
 end
