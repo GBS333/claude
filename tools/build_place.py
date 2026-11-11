@@ -76,19 +76,30 @@ def load_models():
             continue
         name = entry.rsplit(".", 1)[0]
         root = ET.parse(os.path.join(folder, entry)).getroot()
-        model = next((i for i in root.findall("Item") if i.get("class") == "Model"), None)
-        if model is None:
+        # aceita um modelo por arquivo (TungTung.rbxmx) OU a pasta inteira salva (BrainrotModels.rbxmx)
+        found = []
+        for top in root.findall("Item"):
+            if top.get("class") == "Model":
+                found.append((top, name))
+            elif top.get("class") == "Folder":
+                for child in top.findall("Item"):
+                    if child.get("class") == "Model":
+                        found.append((child, None))
+        if not found:
             print("  ignorado (sem Model):", entry)
             continue
-        removed = strip_scripts(model)
-        props = model.find("Properties")
-        for prop in props.findall("string"):
-            if prop.get("name") == "Name":
-                prop.text = name
-        items.append(ET.tostring(model, encoding="unicode"))
+        for model, rename in found:
+            removed = strip_scripts(model)
+            model_name = rename
+            for prop in model.find("Properties").findall("string"):
+                if prop.get("name") == "Name":
+                    if rename:
+                        prop.text = rename
+                    model_name = prop.text
+            items.append(ET.tostring(model, encoding="unicode"))
+            print("  modelo:", model_name, "(scripts removidos: %d)" % removed if removed else "")
         for block in root.findall("SharedStrings"):
             shared.extend(ET.tostring(s, encoding="unicode") for s in block)
-        print("  modelo:", name, "(scripts removidos: %d)" % removed if removed else "")
     shared_xml = "<SharedStrings>%s</SharedStrings>" % "".join(shared) if shared else ""
     return "".join(items), shared_xml
 
