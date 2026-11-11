@@ -152,7 +152,7 @@ end
 -- Dinheiro (canto superior esquerdo)
 ---------------------------------------------------------------------
 local cashFrame = new("Frame", {
-	Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(230, 70),
+	Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(250, 100),
 	BackgroundColor3 = DARK, BackgroundTransparency = 0.1, Parent = gui,
 })
 corner(cashFrame, 12)
@@ -163,10 +163,24 @@ local cashLabel = label({
 	TextXAlignment = Enum.TextXAlignment.Left, Parent = cashFrame,
 })
 local incomeLabel = label({
-	Position = UDim2.fromOffset(10, 42), Size = UDim2.new(1, -20, 0, 22),
+	Position = UDim2.fromOffset(10, 40), Size = UDim2.new(1, -20, 0, 20),
 	Text = "Renda: +$0/s", TextColor3 = Color3.fromRGB(200, 255, 200),
 	TextXAlignment = Enum.TextXAlignment.Left, Parent = cashFrame,
 })
+local levelLabel = label({
+	Position = UDim2.fromOffset(10, 62), Size = UDim2.new(1, -20, 0, 16),
+	Text = "⭐ Nível 1", TextColor3 = Color3.fromRGB(255, 230, 120),
+	TextXAlignment = Enum.TextXAlignment.Left, Parent = cashFrame,
+})
+local playerXpBack = new("Frame", {
+	Position = UDim2.fromOffset(10, 82), Size = UDim2.new(1, -20, 0, 10),
+	BackgroundColor3 = Color3.fromRGB(50, 50, 60), BorderSizePixel = 0, Parent = cashFrame,
+})
+corner(playerXpBack, 5)
+local playerXpFill = new("Frame", {
+	Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(255, 210, 80), BorderSizePixel = 0, Parent = playerXpBack,
+})
+corner(playerXpFill, 5)
 
 ---------------------------------------------------------------------
 -- Dica de como jogar
@@ -211,9 +225,9 @@ end
 ---------------------------------------------------------------------
 local menu = new("Frame", {
 	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
-	Size = UDim2.fromOffset(150, 4 * 54), BackgroundTransparency = 1, Parent = gui,
+	Size = UDim2.fromOffset(150, 8 * 46), BackgroundTransparency = 1, Parent = gui,
 })
-new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = menu })
+new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = menu })
 
 local panel = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.9, 0.75),
@@ -240,6 +254,7 @@ new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.Layou
 
 local currentPanel = nil
 local renderers = {}
+local dataListeners = {}
 
 local function clearScroll()
 	for _, child in ipairs(scroll:GetChildren()) do
@@ -316,9 +331,10 @@ renderers.Inventory = function()
 			used += 1
 		end
 	end
+	local maxSlots = Stats.maxSlots(data.rebirths)
 	rowText(unlockRow, "Pedestais: " .. used .. " usados / " .. data.unlockedSlots .. " desbloqueados",
-		Color3.new(1, 1, 1), "Máximo: " .. Config.Tycoon.SlotCount, 150)
-	if nextIndex <= Config.Tycoon.SlotCount then
+		Color3.new(1, 1, 1), "Máximo agora: " .. maxSlots .. " (mais com ♻ Rebirth, até " .. Config.Tycoon.SlotCount .. ")", 150)
+	if nextIndex <= maxSlots then
 		local price = Config.Tycoon.SlotPrices[nextIndex] or 0
 		local b = button({
 			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(140, 40),
@@ -350,7 +366,7 @@ renderers.Inventory = function()
 			return ka > kb
 		end
 		local da, db = Config.getBrainrot(a.id), Config.getBrainrot(b.id)
-		return Stats.income(da, a.level or 1) > Stats.income(db, b.level or 1)
+		return Stats.income(da, a.level or 1, a.mutation) > Stats.income(db, b.level or 1, b.mutation)
 	end)
 
 	for i, item in ipairs(items) do
@@ -367,8 +383,9 @@ renderers.Inventory = function()
 			local where = if isCompanion then "⚔ Parceiro" elseif item.slot then "Pedestal " .. item.slot else "Guardado"
 			local xpText = if level >= Config.Levels.MaxLevel then "MÁX"
 				else "XP " .. math.floor(item.xp or 0) .. "/" .. Stats.xpToNext(level)
-			rowText(r, Stats.displayName(def, level) .. "  Lv." .. level, rarity.color,
-				rarity.display .. " • +$" .. fmt(Stats.income(def, level)) .. "/s • " .. xpText .. " • " .. where, 270)
+			local income = Stats.income(def, level, item.mutation) * Stats.rebirthIncomeMultiplier(data.rebirths)
+			rowText(r, Stats.displayName(def, level, item.mutation) .. "  Lv." .. level, rarity.color,
+				rarity.display .. " • +$" .. fmt(income) .. "/s • " .. xpText .. " • " .. where, 270)
 
 			local companionButton = button({
 				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -180, 0.5, 0), Size = UDim2.fromOffset(80, 40),
@@ -394,7 +411,7 @@ renderers.Inventory = function()
 				act(if item.slot then "Store" else "Place", item.uid)
 			end)
 
-			local price = Stats.sellPrice(def, level)
+			local price = Stats.sellPrice(def, level, item.mutation)
 			local sellButton = button({
 				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(80, 40),
 				Text = "Vender $" .. fmt(price), BackgroundColor3 = Color3.fromRGB(230, 150, 40), Parent = r,
@@ -429,18 +446,22 @@ renderers.Shop = function()
 	if not data then
 		return
 	end
+	local rebirths = data.rebirths or 0
+	local LOCKED = Color3.fromRGB(90, 90, 100)
 
-	header(0, "Bolas de Captura")
+	header(0, "⚪ Bolas de Captura")
 	for i, ballDef in ipairs(Config.Balls) do
 		local r = row(i, 60)
 		new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = ballDef.color, BorderSizePixel = 0, Parent = r })
+		local locked = (ballDef.rebirth or 0) > rebirths
 		rowText(r, ballDef.name .. "  (você tem " .. (data.balls[ballDef.id] or 0) .. ")", ballDef.color,
-			"Chance x" .. ballDef.multiplier .. " • $" .. fmt(ballDef.price) .. " cada", 210)
+			"Chance x" .. ballDef.multiplier .. " • $" .. fmt(ballDef.price) .. " cada"
+				.. (if locked then " • 🔒 ♻ Rebirth " .. ballDef.rebirth else ""), 210)
 		for j, amount in ipairs({ 1, 5, 10 }) do
 			local b = button({
 				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8 - (3 - j) * 70, 0.5, 0),
-				Size = UDim2.fromOffset(64, 40), Text = "x" .. amount, BackgroundColor3 = Color3.fromRGB(60, 170, 90),
-				Parent = r,
+				Size = UDim2.fromOffset(64, 40), Text = if locked then "🔒" else "x" .. amount,
+				BackgroundColor3 = if locked then LOCKED else Color3.fromRGB(60, 170, 90), Parent = r,
 			})
 			b.Activated:Connect(function()
 				act("BuyBall", ballDef.id, amount)
@@ -448,19 +469,22 @@ renderers.Shop = function()
 		end
 	end
 
-	header(100, "Tacos de Beisebol")
+	header(100, "🏏 Objetos de Bater (acertam brainrots e jogadores)")
 	for i, batDef in ipairs(Config.Bats) do
 		local r = row(100 + i, 60)
 		new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = batDef.color, BorderSizePixel = 0, Parent = r })
 		local owned = data.ownedBats[batDef.id]
 		local equipped = data.bat == batDef.id
+		local locked = not owned and (batDef.rebirth or 0) > rebirths
 		rowText(r, batDef.name, batDef.color,
-			"Dano " .. batDef.damage .. " • Alcance " .. batDef.range .. (if owned then "" else " • $" .. fmt(batDef.price)), 130)
+			"Dano " .. batDef.damage .. " • PvP " .. batDef.pvpDamage .. " • Empurrão " .. batDef.knockback
+				.. (if owned then "" else " • $" .. fmt(batDef.price))
+				.. (if locked then " • 🔒 ♻ " .. batDef.rebirth else ""), 130)
 		local b = button({
 			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(120, 40),
-			Text = if equipped then "Equipado" elseif owned then "Equipar" else "Comprar",
+			Text = if equipped then "Equipado" elseif owned then "Equipar" elseif locked then "🔒 Rebirth" else "Comprar",
 			BackgroundColor3 = if equipped then Color3.fromRGB(100, 100, 110) elseif owned then Color3.fromRGB(70, 140, 255)
-				else Color3.fromRGB(60, 170, 90),
+				elseif locked then LOCKED else Color3.fromRGB(60, 170, 90),
 			Parent = r,
 		})
 		b.Activated:Connect(function()
@@ -470,9 +494,29 @@ renderers.Shop = function()
 		end)
 	end
 
-	local tip = row(200, 56)
+	header(200, "🎽 Equipamentos")
+	for i, gear in ipairs(Config.Gear) do
+		local r = row(200 + i, 60)
+		new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = gear.color, BorderSizePixel = 0, Parent = r })
+		local owned = data.ownedGear and data.ownedGear[gear.id]
+		local locked = not owned and (gear.rebirth or 0) > rebirths
+		rowText(r, gear.name, gear.color, gear.description .. (if owned then "" else " • $" .. fmt(gear.price)), 130)
+		local b = button({
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(120, 40),
+			Text = if owned then "✔ Seu" elseif locked then "🔒 Rebirth" else "Comprar",
+			BackgroundColor3 = if owned then Color3.fromRGB(100, 100, 110) elseif locked then LOCKED else Color3.fromRGB(60, 170, 90),
+			Parent = r,
+		})
+		b.Activated:Connect(function()
+			if not owned then
+				act("BuyGear", gear.id)
+			end
+		end)
+	end
+
+	local tip = row(300, 56)
 	rowText(tip, "💡 Dica", Color3.fromRGB(255, 220, 120),
-		"Taco forte demais pode nocautear o brainrot e ele foge! Use o taco certo.", 0)
+		"Arma forte demais nocauteia o brainrot! Martelo e frigideira empurram muito os jogadores.", 0)
 end
 
 ---------------------------------------------------------------------
@@ -491,18 +535,27 @@ renderers.Dex = function()
 		end
 	end
 	header(0, "Descobertos: " .. found .. " / " .. #Config.Brainrots .. "   •   Total capturados: " .. data.totalCaught)
+	local mutationNames = {}
+	for _, id in ipairs(Config.MutationOrder) do
+		local m = Config.Mutations[id]
+		table.insert(mutationNames, m.icon .. m.name .. " x" .. m.income)
+	end
+	local mrow = row(0.5, 56)
+	rowText(mrow, "🧬 Mutações (renda)", Color3.fromRGB(255, 220, 120), table.concat(mutationNames, "  "), 0)
 
 	for i, def in ipairs(Config.Brainrots) do
 		local rarity = Config.getRarity(def.rarity)
 		local r = row(i, 60)
 		new("Frame", { Size = UDim2.new(0, 6, 1, 0), BackgroundColor3 = rarity.color, BorderSizePixel = 0, Parent = r })
 		local times = data.dex[def.id]
+		local biome = Config.getBiome(def.biome)
+		local where = if biome then biome.icon .. " " .. biome.name else "?"
 		if times then
 			local evoText = if def.evolutions then " • Evolui: " .. table.concat(def.evolutions, " → ") else ""
 			rowText(r, def.name .. "  (x" .. times .. ")", rarity.color,
-				rarity.display .. " • Captura " .. math.floor(def.catchRate * 100) .. "%" .. evoText, 0)
+				rarity.display .. " • " .. where .. " • Captura " .. math.floor(def.catchRate * 1000) / 10 .. "%" .. evoText, 0)
 		else
-			rowText(r, "???", Color3.fromRGB(150, 150, 160), rarity.display .. " • Ainda não capturado", 0)
+			rowText(r, "???", Color3.fromRGB(150, 150, 160), rarity.display .. " • Vive em: " .. where, 0)
 		end
 	end
 end
@@ -513,12 +566,16 @@ end
 local menuItems = {
 	{ text = "🎒 Brainrots", color = Color3.fromRGB(70, 140, 255), click = function() openPanel("Inventory") end },
 	{ text = "🛒 Loja", color = Color3.fromRGB(60, 170, 90), click = function() openPanel("Shop") end },
+	{ text = "🗺 Áreas", color = Color3.fromRGB(40, 170, 160), click = function() openPanel("Areas") end },
+	{ text = "♻ Rebirth", color = Color3.fromRGB(230, 90, 160), click = function() openPanel("Rebirth") end },
+	{ text = "👥 Jogadores", color = Color3.fromRGB(110, 110, 230), click = function() openPanel("Players") end },
 	{ text = "📖 Dex", color = Color3.fromRGB(175, 85, 255), click = function() openPanel("Dex") end },
 	{ text = "🏠 Base", color = Color3.fromRGB(230, 150, 40), click = function() act("Home") end },
+	{ text = "🔒 Trancar", color = Color3.fromRGB(200, 70, 70), click = function() act("Lock") end },
 }
 for i, info in ipairs(menuItems) do
 	local b = button({
-		Size = UDim2.new(1, 0, 0, 46), LayoutOrder = i, Text = info.text, BackgroundColor3 = info.color, Parent = menu,
+		Size = UDim2.new(1, 0, 0, 40), LayoutOrder = i, Text = info.text, BackgroundColor3 = info.color, Parent = menu,
 	})
 	stroke(b, Color3.new(0, 0, 0), 2)
 	b.Activated:Connect(info.click)
@@ -538,20 +595,34 @@ local function applyData(newData)
 	for _, item in ipairs(data.inventory) do
 		local def = Config.getBrainrot(item.id)
 		if item.slot and def then
-			income += Stats.income(def, item.level or 1)
+			income += Stats.income(def, item.level or 1, item.mutation)
 		end
 	end
+	income *= Stats.rebirthIncomeMultiplier(data.rebirths)
 	incomeLabel.Text = "Renda: +$" .. fmt(income) .. "/s"
+
+	local level = data.playerLevel or 1
+	levelLabel.Text = "⭐ Nível " .. level .. "   ♻ Rebirth " .. (data.rebirths or 0)
+	if level >= Config.PlayerLevels.Max then
+		playerXpFill.Size = UDim2.fromScale(1, 1)
+	else
+		playerXpFill.Size = UDim2.fromScale(math.clamp((data.playerXp or 0) / Stats.playerXpToNext(level), 0, 1), 1)
+	end
 
 	for _, ballDef in ipairs(Config.Balls) do
 		local entry = ballButtons[ballDef.id]
-		entry.button.Text = ballDef.name .. "\nx" .. (data.balls[ballDef.id] or 0)
+		local locked = (ballDef.rebirth or 0) > (data.rebirths or 0) and (data.balls[ballDef.id] or 0) == 0
+		entry.button.Text = if locked then ballDef.name .. "\n🔒 ♻" .. ballDef.rebirth
+			else ballDef.name .. "\nx" .. (data.balls[ballDef.id] or 0)
 		local selected = data.selectedBall == ballDef.id
 		entry.stroke.Thickness = if selected then 4 else 0
 		entry.button.BackgroundTransparency = if selected then 0 else 0.35
 	end
 
 	refreshPanel()
+	for _, listener in ipairs(dataListeners) do
+		task.spawn(listener, data)
+	end
 end
 
 DataUpdated.OnClientEvent:Connect(applyData)
@@ -593,14 +664,14 @@ local function showBig(text: string, color: Color3, duration: number?)
 	end)
 end
 
-CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance, level)
+CatchResult.OnClientEvent:Connect(function(success, brainrotId, chance, level, mutation)
 	local def = Config.getBrainrot(brainrotId)
 	if not def then
 		return
 	end
 	local rarity = Config.getRarity(def.rarity)
 	if success then
-		showBig("✨ CAPTUROU! ✨\n" .. def.name .. " Lv." .. (level or 1) .. " (" .. rarity.display .. ")", rarity.color)
+		showBig("✨ CAPTUROU! ✨\n" .. Stats.displayName(def, 1, mutation) .. " Lv." .. (level or 1) .. " (" .. rarity.display .. ")", rarity.color)
 		toast("Ele está na sua barra de itens! Segure ele e clique perto de um pedestal da sua base 🏠", GREEN)
 	else
 		showBig("💨 Escapou! 💨\nChance era " .. math.floor(chance * 100) .. "% — bata mais nele!", RED)
@@ -627,6 +698,12 @@ CompanionEvent.OnClientEvent:Connect(function(kind, a, b)
 		toast("😵 " .. a .. " desmaiou! Volta em " .. b .. "s.", RED)
 	elseif kind == "revive" then
 		toast("💪 " .. a .. " voltou para a luta!", GREEN)
+	elseif kind == "playerlevel" then
+		showBig("⭐ VOCÊ SUBIU PARA O NÍVEL " .. a .. "! ⭐", Color3.fromRGB(255, 220, 90))
+	elseif kind == "rebirth" then
+		showBig("♻ REBIRTH " .. a .. "! ♻\nMais renda, pedestais e itens novos!", Color3.fromRGB(255, 120, 200), 4)
+	elseif kind == "boss" then
+		showBig("👑 CHEFÃO DERROTADO! 👑\n" .. a .. "  +$" .. fmt(b), Color3.fromRGB(255, 200, 60), 4)
 	end
 end)
 
@@ -668,15 +745,21 @@ RunService.RenderStepped:Connect(function()
 	end
 	local health = model:GetAttribute("Health")
 	local maxHealth = model:GetAttribute("MaxHealth") or def.maxHealth
-	local ballDef = Config.getBall(data and data.selectedBall or "Basica") or Config.Balls[1]
-	local chance = CatchMath.getChance(def.catchRate, health, maxHealth, ballDef.multiplier)
-
 	local rarity = Config.getRarity(def.rarity)
-	targetName.Text = def.name .. "  Lv." .. (model:GetAttribute("Level") or 1)
-	targetName.TextColor3 = rarity.color
 	targetStroke.Color = rarity.color
-	targetChance.Text = "❤ " .. math.ceil(health) .. "/" .. maxHealth .. "   🎯 Chance: " .. math.floor(chance * 100) .. "%"
-	targetChance.TextColor3 = if chance >= 0.5 then GREEN elseif chance >= 0.2 then Color3.fromRGB(255, 210, 80) else RED
+	if model:GetAttribute("IsBoss") then
+		targetName.Text = "👑 CHEFÃO"
+		targetName.TextColor3 = RED
+		targetChance.Text = "❤ " .. fmt(math.ceil(health)) .. "/" .. fmt(maxHealth) .. "   não dá para capturar"
+		targetChance.TextColor3 = RED
+	else
+		local ballDef = Config.getBall(data and data.selectedBall or "Basica") or Config.Balls[1]
+		local chance = CatchMath.getChance(def.catchRate, health, maxHealth, ballDef.multiplier)
+		targetName.Text = Stats.displayName(def, 1, model:GetAttribute("Mutation")) .. "  Lv." .. (model:GetAttribute("Level") or 1)
+		targetName.TextColor3 = rarity.color
+		targetChance.Text = "❤ " .. math.ceil(health) .. "/" .. maxHealth .. "   🎯 Chance: " .. math.floor(chance * 1000) / 10 .. "%"
+		targetChance.TextColor3 = if chance >= 0.5 then GREEN elseif chance >= 0.2 then Color3.fromRGB(255, 210, 80) else RED
+	end
 	targetInfo.Position = UDim2.fromOffset(mouse.X + 18, mouse.Y + 18)
 	targetInfo.Visible = true
 end)
@@ -688,7 +771,7 @@ end)
 local companionsFolder = workspace:WaitForChild("Companions")
 
 local hudFrame = new("Frame", {
-	Position = UDim2.fromOffset(12, 92), Size = UDim2.fromOffset(268, 158),
+	Position = UDim2.fromOffset(12, 120), Size = UDim2.fromOffset(268, 158),
 	BackgroundColor3 = DARK, BackgroundTransparency = 0.1, Parent = gui,
 })
 corner(hudFrame, 12)
@@ -834,11 +917,11 @@ RunService.RenderStepped:Connect(function()
 	hpBack.Visible, xpBack.Visible, moveRow.Visible = true, true, true
 
 	local level = item.level or 1
-	hudName.Text = "⚔ " .. Stats.displayName(def, level) .. "  Lv." .. level
+	hudName.Text = "⚔ " .. Stats.displayName(def, level, item.mutation) .. "  Lv." .. level
 	hudName.TextColor3 = Config.getRarity(def.rarity).color
 
 	local model = findMyCompanion()
-	local maxHealth = (model and model:GetAttribute("MaxHealth")) or Stats.companionMaxHealth(def, level)
+	local maxHealth = (model and model:GetAttribute("MaxHealth")) or Stats.companionMaxHealth(def, level, item.mutation)
 	local health = (model and model:GetAttribute("Health")) or maxHealth
 	hpFill.Size = UDim2.fromScale(math.clamp(health / maxHealth, 0, 1), 1)
 	hpText.Text = if health <= 0 then "😵 Desmaiado" else "❤ " .. math.ceil(health) .. " / " .. maxHealth
@@ -889,3 +972,34 @@ player.CharacterAdded:Connect(onCharacter)
 if player.Character then
 	onCharacter(player.Character)
 end
+
+---------------------------------------------------------------------
+-- Social, áreas, rebirth, eventos, roubo, troca e duelo (outro módulo)
+---------------------------------------------------------------------
+require(script.Parent:WaitForChild("Social")).init({
+	gui = gui,
+	new = new,
+	corner = corner,
+	stroke = stroke,
+	label = label,
+	button = button,
+	toast = toast,
+	act = act,
+	showBig = showBig,
+	renderers = renderers,
+	openPanel = openPanel,
+	setTitle = function(text)
+		panelTitle.Text = text
+	end,
+	clearScroll = clearScroll,
+	row = row,
+	header = header,
+	rowText = rowText,
+	getData = function()
+		return data
+	end,
+	onData = function(listener)
+		table.insert(dataListeners, listener)
+	end,
+	colors = { GREEN = GREEN, RED = RED, DARK = DARK, DARK2 = DARK2 },
+})

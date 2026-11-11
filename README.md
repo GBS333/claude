@@ -1,216 +1,209 @@
 # 🏏 Brainrot Tycoon: Caça e Captura
 
-Jogo de Roblox onde você **bate nos brainrots com um taco de beisebol**, **captura eles com bolas**
-(quanto **menos vida** o brainrot tiver, **maior a chance** de pegar), **luta usando seus brainrots como parceiros**
-(eles ganham XP, sobem de nível, aprendem ataques e **evoluem**) e coloca eles na sua **base (tycoon)**
-para ganhar dinheiro por segundo.
+Jogo de Roblox onde você **bate nos brainrots** com tacos, frigideiras e martelos, **captura eles com bolas**
+(quanto **menos vida**, **maior a chance**), **luta com eles como parceiros** (ganham XP, evoluem e aprendem ataques),
+coloca eles na sua **base** para ganhar dinheiro, explora **6 biomas**, derrota **chefões**, **rouba** e **duela**
+com outros jogadores, faz **trocas** e **rebirth**.
 
 ## Como jogar
 
-1. Você nasce na sua base. Pegue o **🏏 Taco** (tecla 1) e vá até a **Zona de Caça** no meio do mapa.
+1. Você nasce na sua base. Pegue o **🏏 objeto de bater** (tecla 1) e vá para a **🌳 Floresta**, no meio do mapa.
 2. Bata nos brainrots. Eles **ficam bravos e atacam de volta**!
-3. Quando a vida estiver baixa (barra amarela/vermelha), pegue a **⚪ Bola** (tecla 2) e clique no brainrot.
-   - Passe o mouse em cima do brainrot para ver a **🎯 chance de captura**.
+3. Com a vida baixa, pegue a **⚪ Bola** (tecla 2) e clique nele. Passe o mouse em cima para ver a **🎯 chance**.
    - Vida cheia = chance normal. Quase sem vida = **3x mais chance**.
-   - Se a vida **zerar**, ele **desmaia e foge** (você ganha só um pouquinho de dinheiro).
-   - Se ele escapar da bola, fica bravo de novo e a vida continua baixa. Tente outra vez!
-   - Depois de alguns segundos sem apanhar, ele **regenera** a vida.
-4. O brainrot capturado aparece na sua **barra de itens** (embaixo da tela). Volte para a base (botão **🏠 Base**),
-   **segure ele** e **clique** perto de um pedestal vazio para colocar (ou segure **E** no pedestal).
-   Para tirar do pedestal, segure **E** nele e ele volta para a barra de itens.
-5. Cada brainrot no pedestal gera **$ por segundo**. Pise no **coletor verde** para pegar o dinheiro.
-6. Use o dinheiro na **🛒 Loja**: bolas melhores, tacos mais fortes e mais pedestais.
-7. No menu **🎒 Brainrots**, aperte **⚔ Lutar** para escolher um **parceiro** (veja abaixo).
+   - Vida zerada = ele é **derrotado** (dá dinheiro e XP, mas você não captura).
+4. O brainrot capturado vai para a **barra de itens**. Na sua base, **segure ele e clique** perto de um pedestal vazio.
+5. Cada brainrot no pedestal dá **$ por segundo**. Pise no **coletor verde** para pegar.
+6. No menu **🎒 Brainrots**, aperte **⚔ Lutar** para escolher um **parceiro**.
 
-### ⚔ Parceiro de batalha
+## 🗺 Biomas
 
-- O parceiro **te segue** e **luta contra os brainrots selvagens**. Os selvagens **revidam** e podem nocautear ele.
-- Ele ataca quem você bater com o taco e quem atacar você. Com o **Auto LIGADO**, ataca qualquer selvagem perto de você.
-- Se você estiver **segurando a Bola** e o selvagem estiver com **pouca vida**, o parceiro **para de bater** para você capturar.
-- Se o parceiro desmaiar, ele volta em **20 segundos**. Fora de combate ele recupera vida sozinho.
-- Cada selvagem **derrotado** dá **XP** para o parceiro (selvagens mais raros e de nível mais alto dão mais).
-  Capturar um brainrot com o parceiro do lado também dá metade do XP.
-- **Cada nível:** +8% de vida, +8% de força e +10% de renda no pedestal. Nível máximo: 50.
-- **Evolução:** no **nível 15** e no **nível 30** ele evolui: muda de nome, fica maior, ganha aura (e coroa na
-  evolução final), muito mais vida/força e rende **1,5x** e depois **2,5x** mais na base.
+Cada brainrot nasce no seu bioma. Use o menu **🗺 Áreas** para viajar. Área trancada tem uma barreira vermelha.
 
-| Nível | Ataque novo | Tecla |
+| Bioma | Como libera | Brainrots |
 |---|---|---|
-| 1 | Ataque (automático) | — |
-| 5 | Cabeçada (corpo a corpo forte) | Z |
-| 10 | Rajada Brainrot (de longe) | X |
-| 20 | Terremoto (acerta todos em volta) | C |
-| 30 | **Golpe especial** de cada brainrot (ex.: *Tung Tung Tung!*, *Tsunami Tralala*, *Bombardeio*) | V |
+| 🌳 Floresta | Livre | Lirilì Larilà, Boneca Ambalabu, Trippi Troppi, Chimpanzini Bananini, Tung Tung Tung Sahur, Brr Brr Patapim, Orangutini Ananassini |
+| 🏜 Deserto | Nível 5 | Il Cacto Hipopotamo, Rhino Toasterino, Tric Trac Baraboom, Frigo Camelo, Udin Din Din Dun |
+| 🐊 Pântano | Nível 12 | Glorbo Fruttodrillo, Bobritto Bandito, Burbaloni Luliloli, Tralalero Tralala |
+| ❄ Montanha de Neve | Derrotar o chefão **Tung Tung Gigante** (Floresta) | Brri Brri Bicus Dicus, Ballerina Cappuccina, Cocofanto Elefanto |
+| 🌋 Vulcão | Derrotar o chefão **Frigo Camelo Titã** (Neve) | Ta Ta Ta Ta Sahur, Cappuccino Assassino, Bombardiro Crocodilo, Svinino Bombondino |
+| ☁ Céu Celestial | Derrotar o **Bombardiro Imperador** (Vulcão) + 1 rebirth | Bombombini Gusini, La Vaca Saturno Saturnita, **Girafa Celestre**, **Odin Din Din Dun** |
 
-Mire com o mouse no brainrot e aperte a tecla (ou toque no botão do ataque na tela).
-
-> Os selvagens também têm **nível** (Comum Lv.1–5 até Mítico Lv.15–20). Quando você captura, o brainrot vem
-> com o nível que tinha!
+O Céu Celestial é uma ilha flutuando. Para ir, use o **Portal Celestial** da praça do spawn ou o menu Áreas.
 
 ### Raridades
 
-Vida e renda abaixo são no **nível 1** (aumentam com o nível).
+Comum → Raro → Épico → Lendário → **Mítico** → **Celestial**. Míticos e Celestiais aparecem **bem pouco**.
+Os selvagens também têm **nível**, e o brainrot capturado vem com o nível que tinha.
 
-| Raridade | Exemplos | Vida | Chance base | Renda | Nível selvagem |
-|---|---|---|---|---|---|
-| Comum | Lirilì Larilà, Boneca Ambalabu, Trippi Troppi, Chimpanzini Bananini | 50–70 | 40–50% | $1–3/s | 1–5 |
-| Raro | Tung Tung Tung Sahur, Brr Brr Patapim, Bombombini Gusini | 120–140 | 25–28% | $8–10/s | 3–8 |
-| Épico | Ballerina Cappuccina, Cappuccino Assassino, Frigo Camelo | 250–280 | 12–14% | $25–30/s | 6–12 |
-| Lendário | Tralalero Tralala, Bombardiro Crocodilo | 500–550 | 6–7% | $80–90/s | 10–16 |
-| Mítico | La Vaca Saturno Saturnita | 1000 | 3% | $250/s | 15–20 |
+## 👑 Chefões
 
-### Bolas
+Brainrots gigantes com muita vida. Dão **pancadas no chão** que machucam e empurram todo mundo em volta.
+**Não dá para capturar.** Todo mundo que bater ganha **$**, **XP** e libera a próxima área. Eles voltam depois de um tempo.
 
-| Bola | Multiplicador | Preço |
+## ☢ Eventos e mutações
+
+De tempos em tempos acontece um evento: o céu muda de cor e os brainrots nascem com **mutações**.
+Mutação deixa o brainrot **mais forte** e com **muito mais renda**, e ela continua depois que você captura.
+
+| Mutação | Quando aparece | Renda |
 |---|---|---|
-| Bola Básica | x1 | $15 |
-| Super Bola | x1.75 | $60 |
-| Ultra Bola | x2.75 | $200 |
-| Bola Suprema | x6 | $1.500 |
+| ✨ Dourado | sempre (3%) | x2 |
+| 💎 Diamante | sempre (0,7%) | x4 |
+| ☢ Radioativo | evento **Chuva Radioativa** | x3 |
+| 🌋 Magma | evento **Erupção de Magma** | x4 |
+| 🌈 Arco-Íris | evento **Arco-Íris Brainrot** | x6 |
 
-**Fórmula:** `chance = chance base × multiplicador da bola × (1 + 2 × (1 − vida/vidaMáxima))`
+## ⚔ Parceiro de batalha
 
-### Tacos
+- O parceiro te segue e luta contra os selvagens. Com o **Auto LIGADO**, ele ataca qualquer selvagem perto de você.
+- Se você estiver segurando a Bola e o selvagem estiver com pouca vida, ele **para de bater** para você capturar.
+- Desmaiou? Volta em 20s. Cada selvagem derrotado dá **XP**.
+- **Cada nível:** +vida, +força, +renda. **Evolução** no nível 15 e no 30 (nome novo, maior, aura e coroa).
+- **Ataques:** Z (nível 5), X (nível 10), C (nível 20), V (nível 30, o golpe especial de cada brainrot).
 
-| Taco | Dano | Preço |
+## 🦹 Roubo
+
+- Vá até a base de outro jogador e **segure F** num pedestal para pegar o brainrot dele.
+- Leve até a **sua base** em 60s. Você fica mais lento carregando.
+- Se alguém te **bater**, se você morrer ou se o tempo acabar, ele **volta para o dono**.
+- O dono recebe um **alarme**. Para se proteger, use **🔒 Trancar** no menu (60s, recarga de 3 min).
+- A **Capa de Invisibilidade** ajuda a chegar sem ser visto (mas some quando você pega o brainrot).
+
+## 🥊 PvP e objetos de bater
+
+Os objetos de bater acertam **brainrots e jogadores**, e cada um tem dano e **empurrão** diferentes.
+Perto do spawn ninguém apanha.
+
+| Objeto | Dano | PvP | Empurrão | Preço |
+|---|---|---|---|---|
+| Taco de Madeira | 10 | 8 | 35 | grátis |
+| Frigideira | 15 | 10 | 75 | $350 |
+| Taco de Metal | 22 | 12 | 45 | $600 |
+| Martelo de Borracha | 32 | 12 | 110 | $2.500 |
+| Taco de Ouro | 45 | 15 | 55 | $4.000 |
+| Taco de Diamante | 90 | 18 | 65 | $20.000 |
+| Martelo de Lava | 170 | 22 | 120 | $90.000 + ♻1 |
+| Taco Celestial | 320 | 26 | 130 | $450.000 + ♻2 |
+| Martelo Cósmico | 650 | 32 | 170 | $2,5M + ♻3 |
+
+## 🎽 Equipamentos
+
+| Equipamento | O que faz | Preço |
 |---|---|---|
-| Madeira | 10 | grátis |
-| Metal | 22 | $600 |
-| Ouro | 45 | $4.000 |
-| Diamante | 90 | $20.000 |
+| Mola de Velocidade | Segurando, você corre muito rápido | $2.500 |
+| Mola de Pulo | Segurando, você pula bem alto | $4.000 |
+| Escudo de Bolha | Clique: imune a dano e empurrão por 5s | $8.000 |
+| Capa de Invisibilidade | Clique: invisível por 8s | $15.000 |
 
-> Taco muito forte em brainrot fraco = nocaute! Escolha o taco certo para cada um.
+## 🤝 Troca
+
+Menu **👥 Jogadores** → **🤝 Trocar**. O outro aceita, cada um escolhe brainrots e dinheiro e os dois apertam **Pronto**.
+Se alguém mudar a oferta, os dois precisam apertar Pronto de novo, para ninguém ser enganado.
+
+## ⚔ Duelo
+
+Menu **👥 Jogadores** → **⚔ Duelo**. Os dois vão para a **Arena** e lutam com os objetos de bater, e os parceiros
+lutam entre si. Quem cair perde. O vencedor **escolhe um brainrot** do perdedor, e o perdedor pode
+**pagar um resgate** (2x o preço de venda) para ficar com ele.
+
+## ♻ Rebirth
+
+Menu **♻ Rebirth**. Precisa de nível e dinheiro. O dinheiro volta para o começo, mas você ganha:
+- **+50% de renda** por rebirth;
+- **+2 pedestais** no máximo da base (até 20);
+- bolas novas (Ultra ♻1, Suprema ♻2, **Celestial** ♻3) e armas novas na loja;
+- acesso ao **Céu Celestial** (♻1).
+
+| Rebirth | Nível | Custo |
+|---|---|---|
+| 1 | 15 | $50.000 |
+| 2 | 25 | $250.000 |
+| 3 | 35 | $1M |
+| 4 | 45 | $5M |
+| 5 | 60 | $25M |
 
 ---
 
 ## Como colocar no Roblox Studio
 
-O servidor **constrói o mapa sozinho** quando você aperta Play: uma ilha de terreno com mar e praia, montanhas,
-caminhos de pedra, floresta, flores, a Zona de Caça cercada com 4 portais e uma estátua do Tung Tung no meio,
-6 bases com piso de madeira, muretas e postes de luz. Então você só precisa colocar os scripts.
+O servidor **constrói o mapa sozinho** quando você aperta Play (no modo de edição o mundo fica vazio, é normal).
 
 ### Jeito mais fácil: abrir o arquivo pronto
 
-1. Baixe o arquivo **`BrainrotTycoon.rbxlx`** (na página do repositório no GitHub, clique nele e depois em
-   **Download raw file**).
-2. Dê dois cliques nele (ou, no Roblox Studio, **File → Open from File...**).
-3. Aperte **Play** (F5).
+1. Baixe o **`BrainrotTycoon.rbxlx`** (no GitHub: clique no arquivo → **Download raw file**).
+2. Abra no Roblox Studio (**File → Open from File...**).
+3. Aperte **Play** (F5). Abra **View → Output** para ver erros.
 
 > Mudou algum script na pasta `src`? Gere o arquivo de novo com `python3 tools/build_place.py`.
 
-### Opção A: com Rojo
+### Com Rojo
 
-1. Instale o [Rojo](https://rojo.space/) (extensão do VS Code ou `aftman`/`rokit`) e o plugin do Rojo no Studio.
-2. Nesta pasta, rode `rojo serve`.
-3. No Studio, abra o plugin do Rojo e clique em **Connect**.
-4. Aperte **Play**.
+`rojo serve` nesta pasta e **Connect** no plugin do Rojo no Studio.
 
-### Opção B: copiar e colar na mão
-
-Crie os objetos abaixo no Studio (o nome precisa ser **exatamente** igual) e cole o código de cada arquivo:
-
-```
-ReplicatedStorage
-└── Shared                (Folder)
-    ├── Config            (ModuleScript)  ← src/shared/Config.luau
-    ├── CatchMath         (ModuleScript)  ← src/shared/CatchMath.luau
-    └── Stats             (ModuleScript)  ← src/shared/Stats.luau
-
-ServerScriptService
-└── Server                (Folder)
-    ├── Main              (Script)        ← src/server/Main.server.luau
-    └── Services          (Folder)
-        ├── Remotes       (ModuleScript)  ← src/server/Services/Remotes.luau
-        ├── DataService   (ModuleScript)  ← src/server/Services/DataService.luau
-        ├── BrainrotModels(ModuleScript)  ← src/server/Services/BrainrotModels.luau
-        ├── WorldBuilder  (ModuleScript)  ← src/server/Services/WorldBuilder.luau
-        ├── WildService   (ModuleScript)  ← src/server/Services/WildService.luau
-        ├── TycoonService (ModuleScript)  ← src/server/Services/TycoonService.luau
-        ├── CompanionService (ModuleScript) ← src/server/Services/CompanionService.luau
-        ├── InventoryService (ModuleScript) ← src/server/Services/InventoryService.luau
-        ├── ToolService   (ModuleScript)  ← src/server/Services/ToolService.luau
-        └── ShopService   (ModuleScript)  ← src/server/Services/ShopService.luau
-
-StarterPlayer
-└── StarterPlayerScripts
-    └── Client            (Folder)
-        └── Main          (LocalScript)   ← src/client/Main.client.luau
-```
-
-### Configurações importantes no Studio
+### Configurações importantes
 
 - **Salvar progresso:** publique o jogo e ative *Game Settings → Security → Enable Studio Access to API Services*.
-  Sem isso o jogo funciona, mas não salva.
-- **Máximo de jogadores:** o mapa tem **6 bases**, então coloque *Game Settings → Places → Max Players = 6*
-  (ou adicione mais bases em `Config.Tycoon.Plots`).
+- **Máximo de jogadores:** 6 (são 6 bases).
+- **Testar troca/duelo/roubo:** aba **Test** → escolha **2 jogadores** → **Start**.
+
+## 🧪 Comandos de teste (no chat, só no Studio ou para o dono do jogo)
+
+| Comando | O que faz |
+|---|---|
+| `/ajuda` | Mostra os comandos |
+| `/dinheiro 100000` | Dá dinheiro |
+| `/nivel 30` | Muda seu nível (libera Deserto e Pântano) |
+| `/rebirth 2` | Muda quantos rebirths você tem |
+| `/evento Magma` | Começa um evento (`Radiacao`, `Magma`, `ArcoIris`) |
+| `/chefe TungGigante` | Faz um chefão aparecer (`TungGigante`, `FrigoTita`, `BombardiroImperador`) |
+| `/brainrot TungTung 20 Magma` | Ganha um brainrot (id, nível, mutação) |
+| `/bolas 50` | Ganha bolas de todos os tipos |
+| `/liberar` | Libera todas as áreas |
+
+Para desligar no jogo publicado: `Config.AdminCommands = false`.
 
 ---
 
 ## Deixar os brainrots bonitos (modelos 3D da Toolbox)
 
-Sem modelo, cada brainrot é montado com peças simples no formato dele. Para ficar igual ao meme,
-use os modelos 3D grátis da Toolbox do Roblox:
+Sem modelo, cada brainrot é montado com peças no formato dele. Para ficar igual ao meme:
 
-1. No Studio: **View → Toolbox**, aba **Models**. Pesquise o nome (ex.: `Tung Tung Tung Sahur`).
-2. Clique no modelo para colocar no mapa.
-3. No **Explorer**, crie uma pasta chamada **`BrainrotModels`** dentro de **ServerStorage**
-   (botão direito em ServerStorage → Insert Object → Folder).
-4. Arraste o modelo para dentro dessa pasta e **renomeie** com o `id` da tabela abaixo.
-5. Aperte **Play**. O jogo ajusta o tamanho sozinho e usa o modelo nos selvagens, nos pedestais e no parceiro.
+1. No Studio: **View → Toolbox** → aba **Models** → pesquise o nome (ex.: `Tung Tung Tung Sahur`).
+2. Crie a pasta **`BrainrotModels`** dentro de **ServerStorage**.
+3. Coloque o modelo dentro dela e **renomeie** com o `id` da Config (ex.: `TungTung`, `Tralalero`, `GirafaCelestre`).
+4. Aperte Play. O jogo ajusta o tamanho e usa o modelo nos selvagens, chefões, pedestais, parceiro e na sua mão.
 
-| id (nome do modelo) | Brainrot |
-|---|---|
-| `Lirili` | Lirilì Larilà |
-| `Ambalabu` | Boneca Ambalabu |
-| `TrippiTroppi` | Trippi Troppi |
-| `Chimpanzini` | Chimpanzini Bananini |
-| `TungTung` | Tung Tung Tung Sahur |
-| `Patapim` | Brr Brr Patapim |
-| `Gusini` | Bombombini Gusini |
-| `Ballerina` | Ballerina Cappuccina |
-| `CappuccinoAssassino` | Cappuccino Assassino |
-| `FrigoCamelo` | Frigo Camelo |
-| `Tralalero` | Tralalero Tralala |
-| `Bombardiro` | Bombardiro Crocodilo |
-| `VacaSaturno` | La Vaca Saturno Saturnita |
+Os `id`s de todos os brainrots estão em `src/shared/Config.luau` (primeiro texto de cada linha `B("id", ...)`).
 
-> ⚠️ **Cuidado com vírus:** modelos da Toolbox podem ter scripts escondidos. O jogo **apaga os scripts** das
-> cópias que ele usa, mas mesmo assim, abra o modelo no Explorer e **apague** qualquer `Script`/`LocalScript`
-> que tiver dentro. Prefira modelos com muitos likes.
->
-> Se o brainrot andar de costas ou de lado, coloque `modelYaw = 180` (ou `90`/`-90`) nele na Config.
-> Se ficar grande ou pequeno demais, mude a altura em `size` (o segundo número).
-
----
+> ⚠️ Modelos da Toolbox podem ter **vírus** (scripts escondidos). O jogo apaga os scripts das cópias que usa,
+> mas mesmo assim apague qualquer `Script` dentro do modelo. Se ele andar de costas, use `modelYaw = 180`.
 
 ## Personalizar
 
-Tudo fica em **`src/shared/Config.luau`**:
-
-- **Novos brainrots:** copie um bloco dentro de `Config.Brainrots` e mude `id`, `name`, cores, vida...
-- **Modelos 3D:** veja a seção "Deixar os brainrots bonitos" acima.
-- **Seu próprio mapa:** coloque `Config.BuildMap = false` e ajuste `Config.Wild.ZoneCenter` / `ZoneSize`
-  para a área onde os brainrots devem andar.
-- **Balanceamento:** vida, chance, preços, renda, dano, tempo de regeneração, quantidade de brainrots no mapa.
-- **Níveis e evolução:** `Config.Levels` (XP necessário, bônus por nível, níveis de evolução).
-- **Ataques:** `Config.Moves` (dano, recarga, alcance, nível para aprender e tecla).
-- **Parceiro:** `Config.Companion` (força extra, tempo de desmaio, distância do modo automático).
-- **Nomes das evoluções e golpe especial:** campos `evolutions` e `signature` de cada brainrot.
+Tudo fica em **`src/shared/Config.luau`**: brainrots, biomas, chefões, mutações, eventos, bolas, objetos de bater,
+equipamentos, preços, rebirth, níveis, roubo, PvP e duelo.
 
 ## Estrutura do código
 
 | Arquivo | O que faz |
 |---|---|
 | `shared/Config` | Todos os números e listas do jogo |
-| `shared/CatchMath` | Fórmula de captura (servidor e tela usam a mesma) |
-| `shared/Stats` | Vida/força/renda por nível, evoluções, XP e ataques aprendidos |
-| `server/Main` | Liga tudo e cuida de entrada/saída de jogadores |
-| `DataService` | Salva/carrega dados (DataStore) e o placar (leaderstats) |
-| `WorldBuilder` | Constrói o mapa (terreno, decoração, cerca, portais, estátua, iluminação) |
-| `WildService` | Brainrots selvagens: spawn, IA, vida, ataque, regeneração, desmaio |
-| `InventoryService` | Brainrots capturados viram itens na barra para segurar e colocar no pedestal |
-| `CompanionService` | Parceiro: seguir, lutar, ataques especiais, desmaio, XP, nível e evolução |
-| `ToolService` | Taco (golpe) e Bola (arremesso em arco + tentativa de captura com sacudidas) |
-| `TycoonService` | Bases, pedestais, renda passiva e coletor |
-| `ShopService` | Loja, vender, colocar/guardar e escolher bola |
-| `client/Main` | Interface: dinheiro, bolas, inventário, loja, Brainrotdex, chance na mira e painel do parceiro |
+| `shared/Stats` | Status por nível/evolução/mutação, nível do jogador, regras das áreas |
+| `shared/CatchMath` | Fórmula de captura |
+| `server/Main` | Liga tudo, entrada/saída de jogadores e comandos de teste |
+| `DataService` | Salvar/carregar, placar, transferência de brainrots |
+| `WorldBuilder` | Mapa: terreno, 6 biomas, praça, portais, arena, decoração |
+| `WildService` | Selvagens por bioma, mutações, IA, chefões |
+| `EventService` | Eventos (radiação, magma, arco-íris) |
+| `ProgressService` | Nível do jogador, áreas trancadas, teleporte, recompensas dos chefões, rebirth |
+| `TycoonService` | Bases, pedestais, renda, trancar base |
+| `StealService` | Roubo de brainrots |
+| `ToolService` | Objetos de bater (PvP e empurrão), bola de captura, equipamentos |
+| `CompanionService` | Parceiro: luta, ataques, XP, evolução, duelo |
+| `InventoryService` | Brainrots capturados como itens na barra |
+| `TradeService` | Trocas entre jogadores |
+| `DuelService` | Duelos, escolha do prêmio e resgate |
+| `ShopService` | Pedidos da interface |
+| `client/Main` | Interface principal (dinheiro, nível, bolas, inventário, loja, dex, parceiro) |
+| `client/Social` | Áreas, rebirth, jogadores, troca, duelo, eventos, empurrão, barreiras |

@@ -23,7 +23,7 @@ local function createTool(player: Player, item)
 		return nil
 	end
 	local level = item.level or 1
-	local name = Stats.displayName(def, level)
+	local name = Stats.displayName(def, level, item.mutation)
 
 	local tool = Instance.new("Tool")
 	tool.Name = name .. " Lv." .. level
@@ -31,9 +31,10 @@ local function createTool(player: Player, item)
 	tool.CanBeDropped = false
 	tool:SetAttribute(UID_ATTRIBUTE, item.uid)
 	tool:SetAttribute("Level", level)
+	tool:SetAttribute("Mutation", item.mutation)
 
 	-- miniatura do brainrot soldada na "Handle"
-	local model = BrainrotModels.build(def, HOLD_HEIGHT / math.max(def.size.Y, 0.5), Stats.stage(level))
+	local model = BrainrotModels.build(def, HOLD_HEIGHT / math.max(def.size.Y, 0.5), Stats.stage(level), item.mutation)
 	local root = model.PrimaryPart
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("Humanoid") then
@@ -102,13 +103,17 @@ function InventoryService.sync(player: Player, reorder: boolean?)
 	end
 
 	local existing = {}
+	-- muda o nome se a mutação mudar
+	local function outdated(tool, item)
+		return tool:GetAttribute("Level") ~= (item.level or 1) or tool:GetAttribute("Mutation") ~= item.mutation
+	end
 	for _, container in ipairs({ backpack, player.Character }) do
 		if container then
 			for _, tool in ipairs(container:GetChildren()) do
 				local uid = tool:IsA("Tool") and tool:GetAttribute(UID_ATTRIBUTE)
 				if uid then
 					local item = wanted[uid]
-					if not item or existing[uid] or tool:GetAttribute("Level") ~= (item.level or 1) then
+					if not item or existing[uid] or outdated(tool, item) then
 						tool:Destroy() -- foi colocado/vendido, é repetido ou subiu de nível
 					else
 						existing[uid] = tool

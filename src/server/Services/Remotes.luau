@@ -26,6 +26,8 @@ Remotes.DataUpdated = get("RemoteEvent", "DataUpdated") -- servidor -> jogador: 
 Remotes.Notify = get("RemoteEvent", "Notify") -- servidor -> jogador: mensagem na tela
 Remotes.CatchResult = get("RemoteEvent", "CatchResult") -- servidor -> jogador: capturou ou não
 Remotes.CompanionEvent = get("RemoteEvent", "CompanionEvent") -- servidor -> jogador: subiu de nível, evoluiu...
+Remotes.Knockback = get("RemoteEvent", "Knockback") -- servidor -> jogador: empurrão
+Remotes.Social = get("RemoteEvent", "Social") -- servidor -> jogador: trocas, duelos, pedidos
 Remotes.Action = get("RemoteFunction", "Action") -- jogador -> servidor: comprar, vender, colocar...
 
 function Remotes.notify(player: Player, text: string, color: Color3?)

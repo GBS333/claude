@@ -37,6 +37,26 @@ end
 local Companion = {}
 Companion.__index = Companion
 
+-- O alvo pode ser um brainrot selvagem OU o parceiro de outro jogador (no duelo)
+local function isCompanion(t): boolean
+	return type(t) == "table" and getmetatable(t) == Companion
+end
+local function tAlive(t): boolean
+	if isCompanion(t) then
+		return t:isAlive()
+	end
+	return WildService.isAlive(t) and not t.capturing
+end
+local function tPos(t): Vector3
+	return if isCompanion(t) then t.position else WildService.getPosition(t)
+end
+local function tRadius(t): number
+	return if isCompanion(t) then t.radius else WildService.radius(t)
+end
+local function tHeight(t): number
+	return (t.hipHeight or 2) * 2
+end
+
 function Companion:isAlive(): boolean
 	return not self.destroyed and not self.fainted
 end
@@ -48,8 +68,8 @@ end
 function Companion:refreshStats(fullHeal: boolean)
 	local level = self.item.level
 	local oldMax = self.maxHealth or 1
-	self.maxHealth = Stats.companionMaxHealth(self.def, level)
-	self.power = Stats.companionPower(self.def, level)
+	self.maxHealth = Stats.companionMaxHealth(self.def, level, self.item.mutation)
+	self.power = Stats.companionPower(self.def, level, self.item.mutation)
 	if fullHeal or not self.health then
 		self.health = self.maxHealth
 	else
@@ -73,7 +93,7 @@ function Companion:buildModel()
 		self.model:Destroy()
 	end
 	local def, level = self.def, self.item.level
-	local model = BrainrotModels.build(def, Stats.scale(level), Stats.stage(level))
+	local model = BrainrotModels.build(def, Stats.scale(level), Stats.stage(level), self.item.mutation)
 	model.Name = self.player.Name .. "_Parceiro"
 	model:SetAttribute("OwnerUserId", self.player.UserId)
 	model:SetAttribute("CompanionUid", self.item.uid)
@@ -111,7 +131,7 @@ function Companion:buildModel()
 	name.Position = UDim2.fromOffset(0, 16)
 	name.Size = UDim2.new(1, 0, 0, 22)
 	name.BackgroundTransparency = 1
-	name.Text = Stats.displayName(def, level) .. "  Lv." .. level
+	name.Text = Stats.displayName(def, level, self.item.mutation) .. "  Lv." .. level
 	name.TextColor3 = rarity.color
 	name.TextStrokeTransparency = 0.2
 	name.Font = Enum.Font.FredokaOne
@@ -169,7 +189,7 @@ function Companion:setVisible(visible: boolean)
 				end
 				d.Transparency = 1
 			end
-		elseif d:IsA("BillboardGui") or d:IsA("ParticleEmitter") or d:IsA("PointLight") then
+		elseif d:IsA("BillboardGui") or d:IsA("ParticleEmitter") or d:IsA("PointLight") or d:IsA("Highlight") then
 			d.Enabled = visible
 		end
 	end
@@ -192,7 +212,8 @@ function Companion:takeDamage(amount: number, attackerState)
 	WildService.floatingText(self.position + Vector3.new(0, self.hipHeight * 2 + 1, 0), "-" .. amount, Color3.fromRGB(255, 150, 60))
 
 	-- revida em quem bateu
-	if attackerState and (not self.target or not WildService.isAlive(self.target)) then
+	if attackerState and not isCompanion(attackerState) and not self.duelTarget
+		and (not self.target or not tAlive(self.target)) then
 		self.target = attackerState
 	end
 
@@ -211,7 +232,7 @@ function Companion:faint()
 	faintMemory[self.player] = { uid = self.item.uid, untilTime = self.faintedUntil }
 	WildService.poof(self.position + Vector3.new(0, 2, 0), Color3.fromRGB(150, 150, 150))
 	self:setVisible(false)
-	Remotes.CompanionEvent:FireClient(self.player, "faint", Stats.displayName(self.def, self.item.level), CC.FaintTime)
+	Remotes.CompanionEvent:FireClient(self.player, "faint", Stats.displayName(self.def, self.item.level, self.item.mutation), CC.FaintTime)
 end
 
 function Companion:revive()
@@ -230,7 +251,7 @@ function Companion:revive()
 	self:setVisible(true)
 	self:updateBar()
 	WildService.poof(self.position + Vector3.new(0, 2, 0), Color3.fromRGB(120, 230, 255))
-	Remotes.CompanionEvent:FireClient(self.player, "revive", Stats.displayName(self.def, self.item.level))
+	Remotes.CompanionEvent:FireClient(self.player, "revive", Stats.displayName(self.def, self.item.level, self.item.mutation))
 end
 
 function Companion:destroy()
@@ -295,8 +316,16 @@ local function shockwave(position: Vector3, radius: number, color: Color3)
 	Debris:AddItem(ring, 0.5)
 end
 
+-- dá dano em um alvo (selvagem ou parceiro inimigo no duelo)
+function Companion:hit(target, damage: number)
+	if isCompanion(target) then
+		target:takeDamage(damage * Config.Duel.CompanionDamageScale, self)
+	else
+		WildService.damage(target, damage, self.player, if self:isAlive() then self else nil)
+	end
+end
+
 function Companion:performMove(move, target)
-	local player = self.player
 	local damage = self.power * move.power
 	local color = Config.getRarity(self.def.rarity).color
 	local moveName = Stats.moveName(move, self.def)
@@ -306,27 +335,34 @@ function Companion:performMove(move, target)
 		self.phase += 2.5 -- pulinho de ataque
 		if move.id ~= "Basico" then
 			WildService.floatingText(self.position + Vector3.new(0, self.hipHeight * 2 + 2, 0), moveName .. "!", color)
-			WildService.poof(WildService.getPosition(target) + Vector3.new(0, 2, 0), color)
+			WildService.poof(tPos(target) + Vector3.new(0, 2, 0), color)
 		end
-		WildService.damage(target, damage, player, self)
+		self:hit(target, damage)
 	elseif move.kind == "Projectile" then
 		WildService.floatingText(self.position + Vector3.new(0, self.hipHeight * 2 + 2, 0), moveName .. "!", color)
 		local fromPos = self.position + Vector3.new(0, self.hipHeight * 1.5, 0)
-		local targetPos = WildService.getPosition(target) + Vector3.new(0, target.def.size.Y / 2 + 0.5, 0)
+		local targetPos = tPos(target) + Vector3.new(0, tHeight(target) / 2 + 0.5, 0)
 		local size = if move.signature then 2.5 else 1.4
 		projectile(fromPos, targetPos, color, size, function()
-			if WildService.isAlive(target) then
+			if tAlive(target) then
 				if move.signature then
 					shockwave(targetPos, 6, color)
 				end
-				WildService.damage(target, damage, player, if self:isAlive() then self else nil)
+				self:hit(target, damage)
 			end
 		end)
 	elseif move.kind == "Area" then
 		WildService.floatingText(self.position + Vector3.new(0, self.hipHeight * 2 + 2, 0), moveName .. "!", color)
 		shockwave(self.position + Vector3.new(0, 0.3, 0), move.range, color)
-		for _, state in ipairs(WildService.getInRadius(self.position, move.range)) do
-			WildService.damage(state, damage, player, self)
+		local duelTarget = self.duelTarget
+		if duelTarget then
+			if tAlive(duelTarget) and flat(tPos(duelTarget) - self.position).Magnitude - tRadius(duelTarget) <= move.range then
+				self:hit(duelTarget, damage)
+			end
+		else
+			for _, state in ipairs(WildService.getInRadius(self.position, move.range)) do
+				self:hit(state, damage)
+			end
 		end
 	end
 end
@@ -381,24 +417,30 @@ function Companion:update(dt: number, now: number)
 		self:updateBar()
 	end
 
-	-- validar alvo
+	-- validar alvo (no duelo, o alvo é o parceiro do adversário)
 	local target = self.target
-	if target and (not WildService.isAlive(target) or target.capturing
-		or flat(WildService.getPosition(target) - ownerPos).Magnitude > CC.LeashDistance) then
-		self.target = nil
-		self.queuedMove = nil
-		target = nil
-	end
-	if not target then
-		target = WildService.findAggressor(player, self, ownerPos, CC.AutoTargetRadius + 10)
-		if not target and player:GetAttribute("AutoBattle") ~= false then
-			target = WildService.findNearest(ownerPos, CC.AutoTargetRadius)
-		end
+	if self.duelTarget then
+		target = if tAlive(self.duelTarget) then self.duelTarget else nil
 		self.target = target
+	else
+		if target and (isCompanion(target) or not tAlive(target)
+			or flat(tPos(target) - ownerPos).Magnitude > CC.LeashDistance) then
+			self.target = nil
+			self.queuedMove = nil
+			target = nil
+		end
+		if not target then
+			target = WildService.findAggressor(player, self, ownerPos, CC.AutoTargetRadius + 10)
+			if not target and player:GetAttribute("AutoBattle") ~= false then
+				target = WildService.findNearest(ownerPos, CC.AutoTargetRadius)
+			end
+			self.target = target
+		end
 	end
 
 	-- segurando a bola + selvagem com pouca vida = o parceiro espera você capturar
-	local holdFire = target ~= nil and holdingBall(player) and target.health / target.maxHealth <= 0.25
+	local holdFire = target ~= nil and not isCompanion(target) and holdingBall(player)
+		and target.health / target.maxHealth <= 0.25
 
 	-- longe demais? teleporta para perto do dono
 	if flat(self.position - ownerPos).Magnitude > CC.TeleportDistance then
@@ -408,8 +450,8 @@ function Companion:update(dt: number, now: number)
 	local goal, stopDist
 	local speed = math.max(self.def.speed * 1.3, CC.MinSpeed)
 	if target and not holdFire then
-		goal = WildService.getPosition(target)
-		stopDist = BASIC.range * 0.6 + target.def.size.X / 2 + self.radius
+		goal = tPos(target)
+		stopDist = BASIC.range * 0.6 + tRadius(target) + self.radius
 	else
 		goal = (hrp.CFrame * CFrame.new(3, 0, CC.FollowDistance)).Position
 		stopDist = 1.5
@@ -428,7 +470,7 @@ function Companion:update(dt: number, now: number)
 		moving = true
 	end
 	if target then
-		local look = flat(WildService.getPosition(target) - self.position)
+		local look = flat(tPos(target) - self.position)
 		if look.Magnitude > 0.1 then
 			look = look.Unit
 			self.yaw = math.atan2(-look.X, -look.Z)
@@ -452,7 +494,7 @@ function Companion:update(dt: number, now: number)
 
 	-- atacar
 	if target and not holdFire then
-		local targetDist = flat(WildService.getPosition(target) - self.position).Magnitude - target.def.size.X / 2 - self.radius
+		local targetDist = flat(tPos(target) - self.position).Magnitude - tRadius(target) - self.radius
 		local queued = self.queuedMove
 		if queued and targetDist <= queued.range then
 			self.queuedMove = nil
@@ -538,7 +580,7 @@ function CompanionService.summon(player: Player, uid: string)
 	if not comp then
 		return false, "Não deu para chamar o parceiro."
 	end
-	return true, Stats.displayName(comp.def, item.level) .. " é seu parceiro! ⚔"
+	return true, Stats.displayName(comp.def, item.level, item.mutation) .. " é seu parceiro! ⚔"
 end
 
 -- keepData = true quando o jogador sai do jogo (o parceiro volta na próxima vez)
@@ -592,28 +634,53 @@ function CompanionService.useMove(player: Player, moveId: any, targetModel: any)
 		return true, nil
 	end
 
-	-- alvo: o que está embaixo do mouse, o atual, ou o mais perto
+	-- alvo: no duelo é o parceiro inimigo; senão o que está embaixo do mouse, o atual, ou o mais perto
 	local target
-	if typeof(targetModel) == "Instance" then
-		target = WildService.getStateFromModel(targetModel)
-	end
-	if target and flat(WildService.getPosition(target) - comp.position).Magnitude > CC.LeashDistance then
-		target = nil
-	end
-	target = target or comp.target or WildService.findNearest(comp.position, math.max(move.range, CC.AutoTargetRadius))
-	if not target or not WildService.isAlive(target) or target.capturing then
-		return false, "Nenhum brainrot selvagem por perto."
+	if comp.duelTarget then
+		target = comp.duelTarget
+		if not tAlive(target) then
+			return false, "O parceiro do adversário está desmaiado."
+		end
+	else
+		if typeof(targetModel) == "Instance" then
+			target = WildService.getStateFromModel(targetModel)
+		end
+		if target and flat(WildService.getPosition(target) - comp.position).Magnitude > CC.LeashDistance then
+			target = nil
+		end
+		if comp.target and not isCompanion(comp.target) then
+			target = target or comp.target
+		end
+		target = target or WildService.findNearest(comp.position, math.max(move.range, CC.AutoTargetRadius))
+		if not target or not tAlive(target) then
+			return false, "Nenhum brainrot selvagem por perto."
+		end
 	end
 
 	comp.cooldowns[move.id] = now + move.cooldown
 	comp.target = target
-	local dist = flat(WildService.getPosition(target) - comp.position).Magnitude - target.def.size.X / 2 - comp.radius
+	local dist = flat(tPos(target) - comp.position).Magnitude - tRadius(target) - comp.radius
 	if dist <= move.range then
 		comp:performMove(move, target)
 	else
 		comp.queuedMove = move -- vai correndo e usa quando chegar perto
 	end
 	return true, nil
+end
+
+-- Duelo: o parceiro do jogador luta contra o parceiro do adversário (nil = acabou)
+function CompanionService.setDuelTarget(player: Player, enemy: Player?)
+	local comp = active[player]
+	if not comp then
+		return
+	end
+	comp.duelTarget = if enemy then active[enemy] else nil
+	comp.target = nil
+	comp.queuedMove = nil
+	if comp.fainted and enemy then
+		-- começa o duelo inteiro
+		comp.faintedUntil = os.clock()
+	end
 end
 
 -- XP, níveis, novos ataques e evolução
@@ -633,7 +700,7 @@ function CompanionService.grantXp(player: Player, amount: number)
 
 	local oldLevel = item.level
 	local oldStage = Stats.stage(oldLevel)
-	local oldName = Stats.displayName(comp.def, oldLevel)
+	local oldName = Stats.displayName(comp.def, oldLevel, item.mutation)
 	while item.level < maxLevel and item.xp >= Stats.xpToNext(item.level) do
 		item.xp -= Stats.xpToNext(item.level)
 		item.level += 1
@@ -657,14 +724,14 @@ function CompanionService.grantXp(player: Player, amount: number)
 			if not comp.fainted then
 				comp:buildModel() -- modelo maior e com efeitos
 			end
-			local newName = Stats.displayName(comp.def, item.level)
+			local newName = Stats.displayName(comp.def, item.level, item.mutation)
 			Remotes.CompanionEvent:FireClient(player, "evolve", oldName, newName)
 			WildService.poof(comp.position + Vector3.new(0, 3, 0), Color3.fromRGB(255, 230, 80))
 		elseif not comp.fainted then
 			comp:buildModel() -- atualiza o nome/nível na placa
 		end
 
-		Remotes.CompanionEvent:FireClient(player, "levelup", Stats.displayName(comp.def, item.level), item.level)
+		Remotes.CompanionEvent:FireClient(player, "levelup", Stats.displayName(comp.def, item.level, item.mutation), item.level)
 		for _, move in ipairs(Config.Moves) do
 			if move.level > oldLevel and move.level <= item.level then
 				Remotes.CompanionEvent:FireClient(player, "learn", Stats.moveName(move, comp.def), move.key)
@@ -680,15 +747,23 @@ function CompanionService.onCaptured(player: Player, state)
 end
 
 function CompanionService.start()
-	WildService.onDefeated = function(state, player)
+	WildService.onDefeated(function(state, player)
 		CompanionService.grantXp(player, Stats.xpReward(state.def, state.level))
-	end
-	WildService.onPlayerAttacked = function(player, state)
+	end)
+	WildService.onPlayerAttacked(function(player, state)
 		local comp = active[player]
-		if comp and comp:isAlive() and not comp.target then
+		if comp and comp:isAlive() and not comp.target and not comp.duelTarget then
 			comp.target = state
 		end
-	end
+	end)
+	-- pancada dos chefões também acerta os parceiros
+	WildService.onBossSlam(function(position, radius, damage, state)
+		for _, comp in pairs(active) do
+			if comp:isAlive() and (comp.position - position).Magnitude <= radius + comp.radius then
+				comp:takeDamage(damage, state)
+			end
+		end
+	end)
 
 	local filterTimer = 0
 	RunService.Heartbeat:Connect(function(dt)

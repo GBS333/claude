@@ -1,6 +1,7 @@
--- Constrói o mapa: uma ilha de terreno com mar em volta, montanhas, caminhos de pedra,
--- árvores, flores, pedras, a Zona de Caça cercada (com portais e uma estátua no meio)
--- e uma iluminação mais bonita. As bases (tycoons) são construídas pelo TycoonService.
+-- Constrói o mapa: uma ilha grande com mar em volta e 6 BIOMAS
+-- (Floresta, Deserto, Pântano, Montanha de Neve, Vulcão e o Céu Celestial flutuando),
+-- caminhos de pedra, praça do spawn com o Portal Celestial, Arena de Duelo e decoração.
+-- As bases (tycoons) são construídas pelo TycoonService.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
@@ -17,9 +18,13 @@ local M = Enum.Material
 local terrain = workspace.Terrain
 local rng = Random.new(2025)
 
-local ISLAND = 640 -- tamanho da ilha (grama)
-local BEACH = 40 -- largura da praia
+local ISLAND = 1120
+local BEACH = 40
+local HUB = V(-170, 0, 0)
 
+---------------------------------------------------------------------
+-- Ajudantes
+---------------------------------------------------------------------
 local function part(parent, props)
 	local p = Instance.new("Part")
 	p.Anchored = true
@@ -59,21 +64,17 @@ local function textOn(board: BasePart, text: string, color: Color3, faces)
 		label.TextColor3 = color
 		label.TextStrokeTransparency = 0
 		label.TextScaled = true
+		label.RichText = true
 		label.Font = Enum.Font.FredokaOne
 		label.Parent = gui
 		gui.Parent = board
 	end
 end
 
----------------------------------------------------------------------
--- Onde NÃO colocar decoração (zona de caça, bases, caminhos, spawn)
----------------------------------------------------------------------
-local blocked = {} -- lista de retângulos { minX, maxX, minZ, maxZ }
-
+local blocked = {}
 local function block(cx, cz, sx, sz)
 	table.insert(blocked, { cx - sx / 2, cx + sx / 2, cz - sz / 2, cz + sz / 2 })
 end
-
 local function isFree(x: number, z: number, margin: number): boolean
 	for _, r in ipairs(blocked) do
 		if x > r[1] - margin and x < r[2] + margin and z > r[3] - margin and z < r[4] + margin then
@@ -83,9 +84,6 @@ local function isFree(x: number, z: number, margin: number): boolean
 	return true
 end
 
----------------------------------------------------------------------
--- Terreno
----------------------------------------------------------------------
 local function path(x1, z1, x2, z2, width)
 	local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
 	local sx = math.abs(x2 - x1) + width
@@ -94,64 +92,54 @@ local function path(x1, z1, x2, z2, width)
 	block(cx, cz, sx, sz)
 end
 
-local function buildTerrain()
-	terrain:SetMaterialColor(M.Grass, RGB(100, 180, 75))
-	terrain:SetMaterialColor(M.LeafyGrass, RGB(80, 160, 65))
-	terrain:SetMaterialColor(M.Cobblestone, RGB(160, 150, 135))
-	terrain:SetMaterialColor(M.Sand, RGB(235, 220, 165))
-	terrain:SetMaterialColor(M.Rock, RGB(125, 120, 115))
-	terrain.WaterColor = RGB(40, 150, 210)
-	terrain.WaterTransparency = 0.4
-	terrain.WaterWaveSize = 0.15
-	terrain.WaterWaveSpeed = 8
-	pcall(function()
-		terrain.Decoration = true -- grama animada (se estiver disponível)
-	end)
-
-	-- mar, fundo de areia, praia e a ilha
-	terrain:FillBlock(CFrame.new(0, -22, 0), V(1400, 4, 1400), M.Sand)
-	terrain:FillBlock(CFrame.new(0, -11, 0), V(1400, 18, 1400), M.Water)
-	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND + BEACH * 2, 16, ISLAND + BEACH * 2), M.Sand)
-	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND, 16, ISLAND), M.Grass)
-
-	-- zona de caça com grama mais escura
-	local W = Config.Wild
-	terrain:FillBlock(CFrame.new(W.ZoneCenter.X, -2, W.ZoneCenter.Z), V(W.ZoneSize.X, 4, W.ZoneSize.Y), M.LeafyGrass)
-	block(W.ZoneCenter.X, W.ZoneCenter.Z, W.ZoneSize.X + 8, W.ZoneSize.Y + 8)
-
-	-- caminhos de pedra: das bases até a zona de caça
-	for _, info in ipairs(Config.Tycoon.Plots) do
-		local p = info.position
-		block(p.X, p.Z, Config.Tycoon.PlotSize + 6, Config.Tycoon.PlotSize + 6)
-		local dir = if p.Z > 0 then -1 else 1
-		local front = p.Z + dir * Config.Tycoon.PlotSize / 2
-		path(p.X, front, p.X, front + dir * 14, 10)
+local function unlockText(biome): string
+	local u = biome.unlock or {}
+	local parts = {}
+	if u.level then
+		table.insert(parts, "Nível " .. u.level)
 	end
-	local edge = W.ZoneSize.Y / 2
-	local roadZ = 136
-	for _, s in ipairs({ -1, 1 }) do
-		path(-140, s * roadZ, 140, s * roadZ, 10) -- estrada na frente das bases
-		path(0, s * roadZ, 0, s * (edge + 2), 10) -- até a entrada da zona
+	if u.boss then
+		local boss = Config.getBoss(u.boss)
+		table.insert(parts, "Derrote " .. (if boss then boss.name else u.boss))
 	end
-	path(-250, 0, -W.ZoneSize.X / 2 - 2, 0, 10) -- do spawn até a zona
-	block(-250, 0, 30, 30)
+	if u.rebirths then
+		table.insert(parts, u.rebirths .. " Rebirth")
+	end
+	if #parts == 0 then
+		return "Livre"
+	end
+	return "🔒 " .. table.concat(parts, " + ")
+end
 
-	-- montanhas nas bordas
-	local hills = {
-		V(-275, -12, -275), V(275, -12, -275), V(-275, -12, 275), V(275, -12, 275),
-		V(-300, -16, -110), V(300, -16, 110), V(300, -16, -120), V(-300, -16, 120),
-	}
-	for _, pos in ipairs(hills) do
-		local radius = rng:NextNumber(38, 52)
-		terrain:FillBall(pos, radius, M.Rock)
-		terrain:FillBall(pos + V(0, -radius * 0.25, 0), radius * 0.95, M.Grass)
-		terrain:FillBall(pos + V(0, radius * 0.75, 0), radius * 0.3, M.Snow)
-		block(pos.X, pos.Z, radius * 2, radius * 2)
+-- ponto aleatório dentro do bioma, longe das entradas e do chefão
+local function biomePoint(biome, margin: number)
+	local c = biome.center
+	for _ = 1, 20 do
+		local x = c.X + rng:NextNumber(-biome.size.X / 2 + margin, biome.size.X / 2 - margin)
+		local z = c.Z + rng:NextNumber(-biome.size.Y / 2 + margin, biome.size.Y / 2 - margin)
+		local ok = true
+		local relX, relZ = x - c.X, z - c.Z
+		if (math.abs(relX) < 16 and math.abs(math.abs(relZ) - biome.size.Y / 2) < 20)
+			or (math.abs(relZ) < 16 and math.abs(math.abs(relX) - biome.size.X / 2) < 20) then
+			ok = false -- perto de uma entrada
+		end
+		for _, boss in ipairs(Config.Bosses) do
+			if boss.biome == biome.id and (V(x, 0, z) - V(boss.position.X, 0, boss.position.Z)).Magnitude < 30 then
+				ok = false
+			end
+		end
+		if biome.id == "Floresta" and V(relX, 0, relZ).Magnitude < 22 then
+			ok = false -- estátua
+		end
+		if ok then
+			return V(x, c.Y, z)
+		end
 	end
+	return nil
 end
 
 ---------------------------------------------------------------------
--- Decoração
+-- Peças de decoração
 ---------------------------------------------------------------------
 local function roundTree(parent, pos: Vector3)
 	local height = rng:NextNumber(9, 15)
@@ -163,7 +151,7 @@ local function roundTree(parent, pos: Vector3)
 	ball(parent, size * 0.7, pos + V(-size * 0.3, height, -size * 0.25), green, M.Grass)
 end
 
-local function pineTree(parent, pos: Vector3)
+local function pineTree(parent, pos: Vector3, snowy: boolean?)
 	local height = rng:NextNumber(4, 6)
 	cyl(parent, 1.4, height, pos + V(0, height / 2, 0), RGB(100, 65, 40), M.Wood)
 	local green = RGB(40, rng:NextInteger(110, 140), 60)
@@ -171,6 +159,9 @@ local function pineTree(parent, pos: Vector3)
 	for i = 0, 3 do
 		local d = 9 - i * 2
 		cyl(parent, d, 2.2, pos + V(0, y + 1.1, 0), green, M.Grass).CanCollide = false
+		if snowy then
+			cyl(parent, d * 0.9, 0.5, pos + V(0, y + 2.3, 0), RGB(245, 250, 255), M.Snow).CanCollide = false
+		end
 		y += 2
 	end
 end
@@ -180,53 +171,120 @@ local function flowers(parent, center: Vector3, count: number)
 	local color = colors[rng:NextInteger(1, #colors)]
 	for _ = 1, count do
 		local pos = center + V(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
-		part(parent, {
-			Size = V(0.15, 0.8, 0.15), CFrame = CFrame.new(pos + V(0, 0.4, 0)), Color = RGB(60, 140, 50),
-			CanCollide = false, CastShadow = false,
-		})
+		part(parent, { Size = V(0.15, 0.8, 0.15), CFrame = CFrame.new(pos + V(0, 0.4, 0)), Color = RGB(60, 140, 50), CanCollide = false, CastShadow = false })
 		ball(parent, 0.6, pos + V(0, 0.9, 0), color).CastShadow = false
 	end
 end
 
-local function rock(parent, pos: Vector3)
+local function rock(parent, pos: Vector3, color: Color3?, material)
 	local size = V(rng:NextNumber(2, 5), rng:NextNumber(1.5, 3.5), rng:NextNumber(2, 5))
 	part(parent, {
 		Size = size, CFrame = CFrame.new(pos + V(0, size.Y / 2 - 0.4, 0))
 			* CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, 6.28), rng:NextNumber(-0.3, 0.3)),
-		Color = RGB(130, 125, 120), Material = M.Slate,
+		Color = color or RGB(130, 125, 120), Material = material or M.Slate,
 	})
+end
+
+local function cactus(parent, pos: Vector3)
+	local green = RGB(70, 150, 70)
+	local height = rng:NextNumber(5, 9)
+	cyl(parent, 1.6, height, pos + V(0, height / 2, 0), green, M.Grass)
+	ball(parent, 1.6, pos + V(0, height, 0), green, M.Grass)
+	for _, s in ipairs({ -1, 1 }) do
+		if rng:NextNumber() < 0.75 then
+			local armY = rng:NextNumber(height * 0.35, height * 0.65)
+			part(parent, { Shape = Enum.PartType.Cylinder, Size = V(1.6, 1, 1), CFrame = CFrame.new(pos + V(s * 1.2, armY, 0)), Color = green, Material = M.Grass })
+			cyl(parent, 1, 2.4, pos + V(s * 2, armY + 1.2, 0), green, M.Grass)
+			ball(parent, 1, pos + V(s * 2, armY + 2.4, 0), green, M.Grass)
+		end
+	end
+end
+
+local function deadTree(parent, pos: Vector3)
+	local dark = RGB(70, 55, 45)
+	local height = rng:NextNumber(8, 13)
+	cyl(parent, 1.5, height, pos + V(0, height / 2, 0), dark, M.Wood)
+	for _ = 1, 3 do
+		local y = rng:NextNumber(height * 0.5, height)
+		local a = rng:NextNumber(0, 6.28)
+		part(parent, {
+			Size = V(0.5, 0.5, 4), CFrame = CFrame.new(pos + V(0, y, 0)) * CFrame.Angles(0, a, 0) * CFrame.Angles(math.rad(-30), 0, 0) * CFrame.new(0, 0, -2),
+			Color = dark, Material = M.Wood,
+		})
+	end
+end
+
+local function snowman(parent, pos: Vector3)
+	ball(parent, 4, pos + V(0, 1.8, 0), RGB(250, 250, 255), M.Snow).CanCollide = true
+	ball(parent, 3, pos + V(0, 4.6, 0), RGB(250, 250, 255), M.Snow)
+	ball(parent, 2.2, pos + V(0, 6.6, 0), RGB(250, 250, 255), M.Snow)
+	part(parent, { Size = V(0.3, 0.3, 1), CFrame = CFrame.new(pos + V(0, 6.6, -1.4)), Color = RGB(255, 140, 40), CanCollide = false })
+	for _, s in ipairs({ -1, 1 }) do
+		ball(parent, 0.3, pos + V(s * 0.4, 7, -1), RGB(20, 20, 20))
+	end
+	cyl(parent, 1.6, 1.2, pos + V(0, 8, 0), RGB(30, 30, 30))
+end
+
+local function crystal(parent, pos: Vector3, color: Color3)
+	local height = rng:NextNumber(3, 7)
+	part(parent, {
+		Size = V(1.2, height, 1.2), CFrame = CFrame.new(pos + V(0, height / 2, 0)) * CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, 6.28), rng:NextNumber(-0.3, 0.3)),
+		Color = color, Material = M.Neon, Transparency = 0.2, CanCollide = false,
+	})
+end
+
+local function lavaPool(parent, pos: Vector3)
+	local size = rng:NextNumber(8, 16)
+	local pool = cyl(parent, size, 0.3, pos + V(0, 0.1, 0), RGB(255, 100, 20), M.Neon)
+	pool.CanCollide = false
+	local fire = Instance.new("Fire")
+	fire.Size = 6
+	fire.Heat = 8
+	fire.Parent = pool
+	local light = Instance.new("PointLight")
+	light.Color = RGB(255, 120, 40)
+	light.Range = size
+	light.Brightness = 2
+	light.Parent = pool
+end
+
+local function cloud(parent, pos: Vector3, size: number)
+	for _ = 1, 4 do
+		local p = ball(parent, size * rng:NextNumber(0.6, 1), pos + V(rng:NextNumber(-size, size) * 0.6, rng:NextNumber(-1, 1), rng:NextNumber(-size, size) * 0.4),
+			RGB(255, 255, 255), M.SmoothPlastic)
+		p.Transparency = 0.15
+		p.CastShadow = false
+	end
 end
 
 local function lamp(parent, pos: Vector3)
 	cyl(parent, 0.6, 9, pos + V(0, 4.5, 0), RGB(50, 50, 55), M.Metal)
-	local light = ball(parent, 1.4, pos + V(0, 9.5, 0), RGB(255, 235, 170), M.Neon)
-	local pointLight = Instance.new("PointLight")
-	pointLight.Color = RGB(255, 220, 160)
-	pointLight.Range = 22
-	pointLight.Brightness = 1.5
-	pointLight.Parent = light
+	local bulb = ball(parent, 1.4, pos + V(0, 9.5, 0), RGB(255, 235, 170), M.Neon)
+	local light = Instance.new("PointLight")
+	light.Color = RGB(255, 220, 160)
+	light.Range = 22
+	light.Brightness = 1.5
+	light.Parent = bulb
 end
 
-local function fence(parent, x1, z1, x2, z2, gapCenter: number?, gapSize: number)
+local function fence(parent, x1, z1, x2, z2, gapCenter: number?, gapSize: number, y: number, color: Color3)
 	local dir = V(x2 - x1, 0, z2 - z1)
 	local length = dir.Magnitude
 	local unit = dir.Unit
-	local start = V(x1, 0, z1)
-	local wood = RGB(150, 105, 65)
+	local start = V(x1, y, z1)
 	local function segment(a: number, b: number)
 		if b - a < 1 then
 			return
 		end
 		local mid = start + unit * ((a + b) / 2)
 		local cf = CFrame.lookAt(mid, mid + unit)
-		for _, y in ipairs({ 1.3, 2.5 }) do
-			part(parent, { Size = V(0.3, 0.35, b - a), CFrame = cf + V(0, y, 0), Color = wood, Material = M.WoodPlanks })
+		for _, h in ipairs({ 1.3, 2.5 }) do
+			part(parent, { Size = V(0.3, 0.35, b - a), CFrame = cf + V(0, h, 0), Color = color, Material = M.WoodPlanks })
 		end
 		local d = a
 		while d <= b do
-			local p = start + unit * d
-			part(parent, { Size = V(0.6, 3.2, 0.6), CFrame = CFrame.new(p + V(0, 1.6, 0)), Color = wood, Material = M.Wood })
-			d += 8
+			part(parent, { Size = V(0.6, 3.2, 0.6), CFrame = CFrame.new(start + unit * d + V(0, 1.6, 0)), Color = color, Material = M.Wood })
+			d += 10
 		end
 	end
 	if gapCenter then
@@ -237,26 +295,321 @@ local function fence(parent, x1, z1, x2, z2, gapCenter: number?, gapSize: number
 	end
 end
 
-local function arch(parent, pos: Vector3, facing: Vector3)
+local function fenceBiome(parent, biome, color: Color3)
+	local c = biome.center
+	local hx, hz = biome.size.X / 2, biome.size.Y / 2
+	local gap = 22
+	fence(parent, c.X - hx, c.Z - hz, c.X + hx, c.Z - hz, hx, gap, c.Y, color)
+	fence(parent, c.X - hx, c.Z + hz, c.X + hx, c.Z + hz, hx, gap, c.Y, color)
+	fence(parent, c.X - hx, c.Z - hz, c.X - hx, c.Z + hz, hz, gap, c.Y, color)
+	fence(parent, c.X + hx, c.Z - hz, c.X + hx, c.Z + hz, hz, gap, c.Y, color)
+end
+
+local function arch(parent, pos: Vector3, facing: Vector3, title: string, subtitle: string, color: Color3)
 	local cf = CFrame.lookAt(pos, pos + facing)
-	local stone = RGB(200, 190, 175)
 	for _, s in ipairs({ -1, 1 }) do
-		part(parent, { Size = V(2, 13, 2), CFrame = cf * CFrame.new(s * 8, 6.5, 0), Color = stone, Material = M.Brick })
-		ball(parent, 2.2, (cf * CFrame.new(s * 8, 13.5, 0)).Position, RGB(255, 210, 60), M.Neon)
+		part(parent, { Size = V(2, 14, 2), CFrame = cf * CFrame.new(s * 9, 7, 0), Color = RGB(200, 190, 175), Material = M.Brick })
+		ball(parent, 2.2, (cf * CFrame.new(s * 9, 14.5, 0)).Position, color, M.Neon)
 	end
-	local beam = part(parent, {
-		Size = V(20, 3.5, 1.2), CFrame = cf * CFrame.new(0, 11.5, 0), Color = RGB(70, 45, 30), Material = M.Wood,
-	})
-	textOn(beam, "🏏 ZONA DE CAÇA 🏏", RGB(255, 230, 90), { Enum.NormalId.Front, Enum.NormalId.Back })
+	local beam = part(parent, { Size = V(22, 5, 1.2), CFrame = cf * CFrame.new(0, 12.5, 0), Color = RGB(70, 45, 30), Material = M.Wood })
+	textOn(beam, title .. "\n<font size=\"40\">" .. subtitle .. "</font>", color, { Enum.NormalId.Front, Enum.NormalId.Back })
+end
+
+---------------------------------------------------------------------
+-- Terreno
+---------------------------------------------------------------------
+local function buildTerrain()
+	terrain:SetMaterialColor(M.Grass, RGB(100, 180, 75))
+	terrain:SetMaterialColor(M.LeafyGrass, RGB(80, 160, 65))
+	terrain:SetMaterialColor(M.Cobblestone, RGB(160, 150, 135))
+	terrain:SetMaterialColor(M.Sand, RGB(235, 215, 155))
+	terrain:SetMaterialColor(M.Mud, RGB(85, 75, 55))
+	terrain:SetMaterialColor(M.Basalt, RGB(55, 50, 50))
+	terrain:SetMaterialColor(M.Rock, RGB(125, 120, 115))
+	terrain:SetMaterialColor(M.Salt, RGB(240, 245, 255))
+	terrain.WaterColor = RGB(40, 150, 210)
+	terrain.WaterTransparency = 0.4
+	terrain.WaterWaveSize = 0.15
+	terrain.WaterWaveSpeed = 8
+	pcall(function()
+		terrain.Decoration = true
+	end)
+
+	terrain:FillBlock(CFrame.new(0, -24, 0), V(1800, 4, 1800), M.Sand)
+	terrain:FillBlock(CFrame.new(0, -12, 0), V(1800, 20, 1800), M.Water)
+	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND + BEACH * 2, 16, ISLAND + BEACH * 2), M.Sand)
+	terrain:FillBlock(CFrame.new(0, -8, 0), V(ISLAND, 16, ISLAND), M.Grass)
+
+	local materials = {
+		Floresta = M.LeafyGrass, Deserto = M.Sand, Pantano = M.Mud, Neve = M.Snow, Vulcao = M.Basalt,
+	}
+	for _, biome in ipairs(Config.Biomes) do
+		local c = biome.center
+		if biome.id == "Ceu" then
+			terrain:FillBlock(CFrame.new(c.X, c.Y - 5, c.Z), V(biome.size.X, 10, biome.size.Y), M.Salt)
+			terrain:FillBall(c + V(0, -55, 0), 50, M.Rock)
+			terrain:FillBall(c + V(-50, -35, 30), 28, M.Rock)
+			terrain:FillBall(c + V(55, -38, -25), 30, M.Rock)
+		else
+			terrain:FillBlock(CFrame.new(c.X, -2, c.Z), V(biome.size.X, 4, biome.size.Y), materials[biome.id] or M.Grass)
+			block(c.X, c.Z, biome.size.X + 10, biome.size.Y + 10)
+		end
+	end
+
+	-- poças no pântano e lava rachada no vulcão
+	local swamp = Config.getBiome("Pantano")
+	if swamp then
+		for _ = 1, 10 do
+			local p = biomePoint(swamp, 20)
+			if p then
+				terrain:FillBlock(CFrame.new(p.X, -1, p.Z), V(rng:NextInteger(3, 6) * 4, 2, rng:NextInteger(3, 5) * 4), M.Water)
+			end
+		end
+	end
+	local volcano = Config.getBiome("Vulcao")
+	if volcano then
+		for _ = 1, 14 do
+			local p = biomePoint(volcano, 15)
+			if p then
+				terrain:FillBlock(CFrame.new(p.X, -2, p.Z), V(rng:NextInteger(2, 5) * 4, 4, rng:NextInteger(2, 5) * 4), M.CrackedLava)
+			end
+		end
+	end
+
+	-- caminhos de pedra
+	for _, info in ipairs(Config.Tycoon.Plots) do
+		local p = info.position
+		block(p.X, p.Z, Config.Tycoon.PlotSize + 6, Config.Tycoon.PlotSize + 6)
+		local dir = if p.Z > 0 then -1 else 1
+		local front = p.Z + dir * Config.Tycoon.PlotSize / 2
+		path(p.X, front, p.X, front + dir * 14, 10)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		path(-140, s * 136, 140, s * 136, 10)
+		path(0, s * 136, 0, s * 112, 10)
+	end
+	path(110, 0, 230, 0, 10) -- floresta -> deserto
+	path(-230, 0, -110, 0, 10) -- pântano -> praça -> floresta
+	path(65, -136, 65, -312, 10) -- até a neve
+	path(65, -312, 0, -312, 10)
+	path(-65, 136, -65, 312, 10) -- até o vulcão
+	path(-65, 312, 0, 312, 10)
+	path(170, 0, 170, -56, 8) -- arena
+	block(HUB.X, HUB.Z, 60, 110)
+	block(Config.Duel.Arena.X, Config.Duel.Arena.Z, 80, 80)
+
+	-- montanhas
+	local function mountain(pos: Vector3, radius: number, top)
+		terrain:FillBall(pos, radius, M.Rock)
+		terrain:FillBall(pos + V(0, -radius * 0.25, 0), radius * 0.95, top or M.Grass)
+		block(pos.X, pos.Z, radius * 2, radius * 2)
+	end
+	mountain(V(-480, -12, -480), 50)
+	mountain(V(480, -12, -480), 50)
+	mountain(V(-480, -12, 480), 50)
+	mountain(V(480, -12, 480), 50)
+	for _, x in ipairs({ -330, 330 }) do
+		terrain:FillBall(V(x, -10, -430), 58, M.Rock)
+		terrain:FillBall(V(x, 26, -430), 26, M.Snow)
+		block(x, -430, 116, 116)
+	end
+	for _, x in ipairs({ -330, 330 }) do
+		terrain:FillBall(V(x, -14, 430), 62, M.Basalt)
+		terrain:FillBall(V(x, 40, 430), 14, M.CrackedLava)
+		block(x, 430, 124, 124)
+	end
+end
+
+---------------------------------------------------------------------
+-- Biomas
+---------------------------------------------------------------------
+local function decorateBiome(parent, biome)
+	local folder = Instance.new("Folder")
+	folder.Name = biome.id
+	folder.Parent = parent
+	local function scatter(count: number, margin: number, fn)
+		for _ = 1, count do
+			local p = biomePoint(biome, margin)
+			if p then
+				fn(p)
+			end
+		end
+	end
+
+	if biome.id == "Floresta" then
+		scatter(22, 8, function(p)
+			if rng:NextNumber() < 0.6 then
+				roundTree(folder, p)
+			else
+				pineTree(folder, p)
+			end
+		end)
+		scatter(30, 4, function(p)
+			flowers(folder, p, rng:NextInteger(4, 8))
+		end)
+		scatter(8, 6, function(p)
+			rock(folder, p)
+		end)
+	elseif biome.id == "Deserto" then
+		scatter(26, 8, function(p)
+			cactus(folder, p)
+		end)
+		scatter(16, 6, function(p)
+			rock(folder, p, RGB(200, 160, 110), M.Sandstone)
+		end)
+		scatter(6, 6, function(p)
+			part(folder, { Size = V(0.6, 0.6, 3), CFrame = CFrame.new(p + V(0, 0.3, 0)) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0),
+				Color = RGB(240, 235, 220), CanCollide = false })
+		end)
+	elseif biome.id == "Pantano" then
+		scatter(18, 8, function(p)
+			deadTree(folder, p)
+		end)
+		scatter(30, 4, function(p)
+			for _ = 1, 4 do
+				cyl(folder, 0.2, rng:NextNumber(2, 4), p + V(rng:NextNumber(-1.5, 1.5), 1.2, rng:NextNumber(-1.5, 1.5)), RGB(90, 120, 60)).CanCollide = false
+			end
+		end)
+		scatter(14, 4, function(p)
+			cyl(folder, 0.5, 1.2, p + V(0, 0.6, 0), RGB(230, 220, 200))
+			cyl(folder, 2, 0.5, p + V(0, 1.3, 0), RGB(200, 60, 60)).CanCollide = false
+		end)
+	elseif biome.id == "Neve" then
+		scatter(28, 8, function(p)
+			pineTree(folder, p, true)
+		end)
+		scatter(14, 6, function(p)
+			crystal(folder, p, RGB(150, 220, 255))
+		end)
+		scatter(5, 10, function(p)
+			snowman(folder, p)
+		end)
+	elseif biome.id == "Vulcao" then
+		scatter(12, 10, function(p)
+			lavaPool(folder, p)
+		end)
+		scatter(20, 6, function(p)
+			rock(folder, p, RGB(40, 35, 35), M.Basalt)
+		end)
+		scatter(8, 6, function(p)
+			crystal(folder, p, RGB(255, 120, 40))
+		end)
+	elseif biome.id == "Ceu" then
+		scatter(16, 6, function(p)
+			crystal(folder, p, RGB(130, 240, 255))
+		end)
+		scatter(20, 4, function(p)
+			flowers(folder, p, rng:NextInteger(4, 7))
+		end)
+		for i = 0, 7 do
+			local a = i * math.pi / 4
+			local c = biome.center
+			local pos = c + V(math.cos(a) * 85, 0, math.sin(a) * 85)
+			cyl(folder, 2.5, 14, pos + V(0, 7, 0), RGB(255, 225, 130), M.Marble)
+			ball(folder, 3, pos + V(0, 15, 0), RGB(130, 240, 255), M.Neon)
+		end
+		for _ = 1, 14 do
+			local a = rng:NextNumber(0, 6.28)
+			local r = rng:NextNumber(110, 170)
+			cloud(folder, biome.center + V(math.cos(a) * r, rng:NextNumber(-25, 15), math.sin(a) * r), rng:NextNumber(8, 14))
+		end
+	end
+end
+
+local function biomeEntrances(parent)
+	local colors = {
+		Floresta = RGB(130, 230, 110), Deserto = RGB(255, 210, 110), Pantano = RGB(150, 200, 90),
+		Neve = RGB(180, 230, 255), Vulcao = RGB(255, 120, 60), Ceu = RGB(130, 240, 255),
+	}
+	-- direção da entrada principal de cada bioma (para onde o portal olha)
+	local mainGate = { Deserto = V(-1, 0, 0), Pantano = V(1, 0, 0), Neve = V(0, 0, 1), Vulcao = V(0, 0, -1) }
+	for _, biome in ipairs(Config.Biomes) do
+		local color = colors[biome.id] or RGB(255, 255, 255)
+		if biome.id ~= "Ceu" then
+			fenceBiome(parent, biome, if biome.id == "Neve" then RGB(220, 225, 235) else RGB(150, 105, 65))
+		end
+		local c = biome.center
+		local title = biome.icon .. " " .. string.upper(biome.name)
+		if biome.id == "Floresta" then
+			local hx, hz = biome.size.X / 2, biome.size.Y / 2
+			for _, dir in ipairs({ V(0, 0, 1), V(0, 0, -1), V(1, 0, 0), V(-1, 0, 0) }) do
+				arch(parent, c + V(dir.X * hx, 0, dir.Z * hz), dir, title, "Livre", color)
+			end
+		elseif mainGate[biome.id] then
+			local dir = mainGate[biome.id]
+			local pos = c + V(dir.X * biome.size.X / 2, 0, dir.Z * biome.size.Y / 2)
+			arch(parent, pos, dir, title, unlockText(biome), color)
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- Praça do spawn, portais e arena
+---------------------------------------------------------------------
+local function buildHub(parent)
+	-- piso
+	part(parent, { Name = "HubFloor", Size = V(50, 0.4, 100), CFrame = CFrame.new(HUB + V(0, 0.2, 0)), Color = RGB(225, 220, 210), Material = M.Marble })
+	local board = part(parent, { Name = "InfoBoard", Size = V(22, 11, 1), CFrame = CFrame.new(HUB + V(-22, 6.5, 0)) * CFrame.Angles(0, math.rad(90), 0),
+		Color = RGB(60, 45, 35), Material = M.Wood })
+	textOn(board, "🏏 BRAINROT TYCOON\n<font size=\"30\">Bata • Capture • Evolua • Roube • Duele</font>\n"
+		.. "<font size=\"24\">Menu 🗺 Áreas para viajar</font>", RGB(255, 230, 120), { Enum.NormalId.Front })
+
+	-- portal para o Céu Celestial
+	local portalPos = HUB + V(0, 0, 36)
+	local pad = cyl(parent, 12, 0.6, portalPos + V(0, 0.4, 0), RGB(130, 240, 255), M.Neon)
+	pad.Name = "PortalCeu"
+	pad.CanCollide = false
+	local ring = part(parent, { Shape = Enum.PartType.Cylinder, Size = V(0.6, 16, 16),
+		CFrame = CFrame.new(portalPos + V(0, 8.5, 0)) * CFrame.Angles(0, math.rad(90), 0), Color = RGB(255, 230, 120), Material = M.Neon, CanCollide = false, Transparency = 0.3 })
+	ring.Name = "PortalRing"
+	local sign = part(parent, { Size = V(18, 3, 0.6), CFrame = CFrame.new(portalPos + V(0, 18, 0)), Color = RGB(40, 40, 70), Material = M.SmoothPlastic })
+	textOn(sign, "☁ PORTAL CELESTIAL\n<font size=\"30\">" .. unlockText(Config.getBiome("Ceu") or { unlock = {} }) .. "</font>",
+		RGB(150, 240, 255), { Enum.NormalId.Front, Enum.NormalId.Back })
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Color = ColorSequence.new(RGB(150, 240, 255))
+	sparkle.LightEmission = 1
+	sparkle.Rate = 20
+	sparkle.Speed = NumberRange.new(2, 5)
+	sparkle.Lifetime = NumberRange.new(1, 2)
+	sparkle.Size = NumberSequence.new(0.4)
+	sparkle.Parent = pad
+
+	for _, z in ipairs({ -40, 40 }) do
+		lamp(parent, HUB + V(18, 0, z))
+		lamp(parent, HUB + V(-18, 0, z))
+	end
+
+	-- portal de volta no Céu
+	local sky = Config.getBiome("Ceu")
+	if sky then
+		local back = cyl(parent, 10, 0.6, sky.center + V(0, 0.4, sky.size.Y / 2 - 15), RGB(255, 230, 120), M.Neon)
+		back.Name = "PortalVolta"
+		back.CanCollide = false
+		local backSign = part(parent, { Size = V(14, 3, 0.6), CFrame = CFrame.new(back.Position + V(0, 8, 0)), Color = RGB(40, 40, 70) })
+		textOn(backSign, "⬇ VOLTAR", RGB(255, 230, 120), { Enum.NormalId.Front, Enum.NormalId.Back })
+	end
+end
+
+local function buildArena(parent)
+	local c = Config.Duel.Arena
+	part(parent, { Name = "ArenaFloor", Size = V(70, 1, 70), CFrame = CFrame.new(c + V(0, 0.5, 0)), Color = RGB(180, 70, 70), Material = M.Concrete })
+	part(parent, { Name = "ArenaCircle", Shape = Enum.PartType.Cylinder, Size = V(0.2, 40, 40),
+		CFrame = CFrame.new(c + V(0, 1.05, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = RGB(255, 255, 255), Material = M.SmoothPlastic, CanCollide = false })
+	for _, s in ipairs({ -1, 1 }) do
+		part(parent, { Size = V(70, 6, 2), CFrame = CFrame.new(c + V(0, 3, s * 35)), Color = RGB(90, 60, 50), Material = M.Brick })
+		part(parent, { Size = V(2, 6, 70), CFrame = CFrame.new(c + V(s * 35, 3, 0)), Color = RGB(90, 60, 50), Material = M.Brick })
+		cyl(parent, 8, 0.4, c + V(s * Config.Duel.PadOffset, 1.2, 0), if s < 0 then RGB(80, 160, 255) else RGB(255, 90, 90), M.Neon).CanCollide = false
+	end
+	-- entrada (buraco na parede de baixo, do lado do caminho)
+	local sign = part(parent, { Size = V(26, 5, 1), CFrame = CFrame.new(c + V(0, 10, 36)), Color = RGB(60, 30, 30), Material = M.Wood })
+	textOn(sign, "⚔ ARENA DE DUELO", RGB(255, 200, 90), { Enum.NormalId.Front, Enum.NormalId.Back })
 end
 
 local function statue(parent, center: Vector3)
 	local def = Config.getBrainrot("TungTung") or Config.Brainrots[1]
 	cyl(parent, 14, 2, center + V(0, 1, 0), RGB(190, 185, 175), M.Marble)
 	cyl(parent, 11, 2, center + V(0, 3, 0), RGB(210, 205, 195), M.Marble)
-	local plaque = part(parent, {
-		Size = V(8, 1.6, 0.4), CFrame = CFrame.new(center + V(0, 2.6, -5.6)), Color = RGB(255, 205, 60), Material = M.Metal,
-	})
+	local plaque = part(parent, { Size = V(8, 1.6, 0.4), CFrame = CFrame.new(center + V(0, 2.6, -5.6)), Color = RGB(255, 205, 60), Material = M.Metal })
 	textOn(plaque, def.name, RGB(60, 40, 10), { Enum.NormalId.Front })
 	local model = BrainrotModels.build(def, 2.2)
 	local hip = model:GetAttribute("HipHeight") or 3
@@ -277,7 +630,6 @@ local function setupLighting()
 	Lighting.OutdoorAmbient = RGB(150, 150, 165)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
-
 	local function effect(className: string, props)
 		local old = Lighting:FindFirstChild("Brainrot" .. className)
 		if old then
@@ -290,11 +642,9 @@ local function setupLighting()
 		end
 		e.Parent = Lighting
 	end
-	effect("Atmosphere", {
-		Density = 0.28, Offset = 0.2, Color = RGB(200, 225, 255), Decay = RGB(110, 145, 190), Glare = 0.2, Haze = 1,
-	})
+	effect("Atmosphere", { Density = 0.28, Offset = 0.2, Color = RGB(200, 225, 255), Decay = RGB(110, 145, 190), Glare = 0.2, Haze = 1 })
 	effect("BloomEffect", { Intensity = 0.4, Size = 24, Threshold = 1.6 })
-	effect("ColorCorrectionEffect", { Saturation = 0.18, Contrast = 0.06, Brightness = 0.02 })
+	effect("ColorCorrectionEffect", { Saturation = 0.18, Contrast = 0.06, Brightness = 0.02, TintColor = RGB(255, 255, 255) })
 	effect("SunRaysEffect", { Intensity = 0.06, Spread = 0.8 })
 end
 
@@ -311,7 +661,6 @@ function WorldBuilder.build()
 	local map = Instance.new("Folder")
 	map.Name = "Map"
 	map.Parent = workspace
-
 	local baseplate = workspace:FindFirstChild("Baseplate")
 	if baseplate then
 		baseplate:Destroy()
@@ -320,56 +669,22 @@ function WorldBuilder.build()
 	buildTerrain()
 	setupLighting()
 
-	local W = Config.Wild
-	local c = W.ZoneCenter
-	local hx, hz = W.ZoneSize.X / 2, W.ZoneSize.Y / 2
 	local decor = Instance.new("Folder")
 	decor.Name = "Decoracao"
 	decor.Parent = map
-
-	-- cerca da zona de caça com entradas no meio de cada lado
-	local gap = 20
-	fence(map, c.X - hx, c.Z - hz, c.X + hx, c.Z - hz, hx, gap)
-	fence(map, c.X - hx, c.Z + hz, c.X + hx, c.Z + hz, hx, gap)
-	fence(map, c.X - hx, c.Z - hz, c.X - hx, c.Z + hz, hz, gap)
-	fence(map, c.X + hx, c.Z - hz, c.X + hx, c.Z + hz, hz, gap)
-	arch(map, V(c.X, 0, c.Z + hz), V(0, 0, 1))
-	arch(map, V(c.X, 0, c.Z - hz), V(0, 0, -1))
-	arch(map, V(c.X - hx, 0, c.Z), V(-1, 0, 0))
-	arch(map, V(c.X + hx, 0, c.Z), V(1, 0, 0))
-
-	-- estátua do Tung Tung no meio da zona
-	statue(map, V(c.X, W.GroundY, c.Z))
-
-	-- dentro da zona: árvores, flores e pedras (longe do centro)
-	for _ = 1, 22 do
-		local x, z = c.X + rng:NextNumber(-hx + 8, hx - 8), c.Z + rng:NextNumber(-hz + 8, hz - 8)
-		if V(x - c.X, 0, z - c.Z).Magnitude > 22 then
-			if rng:NextNumber() < 0.6 then
-				roundTree(decor, V(x, W.GroundY, z))
-			else
-				pineTree(decor, V(x, W.GroundY, z))
-			end
-		end
+	for _, biome in ipairs(Config.Biomes) do
+		decorateBiome(decor, biome)
 	end
-	for _ = 1, 30 do
-		local x, z = c.X + rng:NextNumber(-hx + 4, hx - 4), c.Z + rng:NextNumber(-hz + 4, hz - 4)
-		if V(x - c.X, 0, z - c.Z).Magnitude > 12 then
-			flowers(decor, V(x, W.GroundY, z), rng:NextInteger(4, 8))
-		end
-	end
-	for _ = 1, 10 do
-		local x, z = c.X + rng:NextNumber(-hx + 6, hx - 6), c.Z + rng:NextNumber(-hz + 6, hz - 6)
-		if V(x - c.X, 0, z - c.Z).Magnitude > 14 then
-			rock(decor, V(x, W.GroundY, z))
-		end
-	end
+	biomeEntrances(map)
+	statue(map, Config.getBiome("Floresta") and Config.getBiome("Floresta").center or V(0, 0, 0))
+	buildHub(map)
+	buildArena(map)
 
-	-- fora da zona: floresta em volta da ilha (sem cobrir bases e caminhos)
+	-- floresta em volta (fora dos biomas, bases e caminhos)
 	local half = ISLAND / 2 - 8
 	local placed = 0
-	for _ = 1, 600 do
-		if placed >= 90 then
+	for _ = 1, 1500 do
+		if placed >= 160 then
 			break
 		end
 		local x, z = rng:NextNumber(-half, half), rng:NextNumber(-half, half)
@@ -388,22 +703,21 @@ function WorldBuilder.build()
 		end
 	end
 
-	-- postes de luz na estrada
 	for _, s in ipairs({ -1, 1 }) do
 		for x = -130, 130, 40 do
 			lamp(map, V(x, 0, s * 136 + s * 7))
 		end
 	end
 
-	-- SPAWN
 	local spawnLocation = workspace:FindFirstChildOfClass("SpawnLocation")
 	if not spawnLocation then
 		spawnLocation = Instance.new("SpawnLocation")
 		spawnLocation.Parent = map
 	end
+	spawnLocation.Name = "SpawnLocation"
 	spawnLocation.Anchored = true
 	spawnLocation.Size = V(14, 1, 14)
-	spawnLocation.CFrame = CFrame.new(-250, 0.5, 0)
+	spawnLocation.CFrame = CFrame.new(HUB + V(0, 0.5, -25))
 	spawnLocation.Material = M.Marble
 	spawnLocation.Color = RGB(240, 240, 240)
 	spawnLocation.Neutral = true
