@@ -176,6 +176,10 @@ Sem modelo, cada brainrot é montado com peças no formato dele. Para ficar igua
 
 Os `id`s de todos os brainrots estão em `src/shared/Config.luau` (primeiro texto de cada linha `B("id", ...)`).
 
+**Guardar os modelos no projeto:** no Studio, clique com o botão direito no modelo → **Save to File...** → escolha
+**.rbxmx** e salve com o nome do `id` (ex.: `TungTung.rbxmx`) na pasta **`models/`** deste repositório.
+O `python3 tools/build_place.py` (e o Rojo) colocam eles em `ServerStorage/BrainrotModels` e removem os scripts.
+
 > ⚠️ Modelos da Toolbox podem ter **vírus** (scripts escondidos). O jogo apaga os scripts das cópias que usa,
 > mas mesmo assim apague qualquer `Script` dentro do modelo. Se ele andar de costas, use `modelYaw = 180`.
 
