@@ -641,8 +641,8 @@ end
 
 local commands = {}
 commands.ajuda = function(player)
-	Remotes.notify(player, "/dinheiro 100000 • /nivel 30 • /rebirth 2 • /evento Magma • /chefe TungGigante • "
-		.. "/brainrot TungTung 20 Magma • /bolas 50 • /liberar", Color3.fromRGB(255, 230, 120))
+	Remotes.notify(player, "Comandos (use / ou !): !dinheiro 100000 • !nivel 30 • !rebirth 2 • !evento Magma • "
+		.. "!chefe TungGigante • !brainrot TungTung 20 Magma • !bolas 50 • !liberar", Color3.fromRGB(255, 230, 120))
 end
 commands.dinheiro = function(player, amount)
 	DataService.addCash(player, tonumber(amount) or 100000)
@@ -687,7 +687,8 @@ commands.liberar = function(player)
 end
 
 local function onChatted(player: Player, message: string)
-	if not isAdmin(player) or string.sub(message, 1, 1) ~= "/" then
+	local prefix = string.sub(message, 1, 1)
+	if not isAdmin(player) or (prefix ~= "/" and prefix ~= "!") then
 		return
 	end
 	local args = string.split(string.sub(message, 2), " ")
